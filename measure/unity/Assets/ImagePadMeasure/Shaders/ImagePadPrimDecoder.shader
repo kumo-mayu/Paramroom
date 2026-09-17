@@ -11,7 +11,10 @@
 //   display canvas  x [256,512) y [0,256)   last completed canvas (what the board shows)
 //   primitive store y [256,272) texel index t = 2*j + h (h = 0/1): bytes of primitive j's bit field
 //                   (4 bytes per texel, value 0..255 exact in half); present flag = byte 7 bit 0
-//   control         y = 280: x0 = pass counter (mod batch count), x1 = epoch, x2 = bg present, x3..5 = bg RGB 0..1
+//   control         y = 280: x0 = pass counter (mod batch count), x1 = epoch, x2 = bg present, x3 = bg RGB 0..255,
+//                   x4 = accepted aspect code, x5 = aspect code of the previous valid packet
+// Aspect code = last packet byte (_P31, unit padding; sim/codecs/prim.js aspectCode, 0 = 1:1). It is accepted only when
+// two consecutive valid packets agree, so a single torn packet cannot change the display shape; reset -> 0.
 // Every texel only depends on the previous buffer and the current packet => idempotent, order independent.
 Shader "ImagePad/PrimDecoder"
 {
@@ -194,6 +197,14 @@ Shader "ImagePad/PrimDecoder"
                         }
                         return prev;
                     }
+                    if (px == 4)
+                    {
+                        if (epoch == 0) return prev;
+                        uint seen = (uint)round(Load(5, CTRL_Y).r);
+                        if (reset) return float4(0, 0, 0, 1);
+                        return g_pk[31] == seen ? float4(g_pk[31], 0, 0, 1) : prev;
+                    }
+                    if (px == 5) return epoch != 0 ? float4(g_pk[31], 0, 0, 1) : prev;
                     return float4(0, 0, 0, 1);
                 }
 

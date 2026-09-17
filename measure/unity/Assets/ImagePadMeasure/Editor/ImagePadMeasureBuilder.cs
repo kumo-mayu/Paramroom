@@ -440,7 +440,7 @@ public static class ImagePadMeasureAnimatorTest
 
 public static class ImagePadPrimTest
 {
-    // batchmode (with graphics): -executeMethod ImagePadPrimTest.Run -imagepadOut <dir>
+    // batchmode (with graphics): -executeMethod ImagePadPrimTest.Run -imagepadOut <dir> [-imagepadData <TestData json name>]
     // Feeds exported prim packets (TestData/prim-kodim23.json) into the PrimDecoder camera loop by setting material
     // properties directly (as the FX blend tree would), renders, and saves the display canvas + timing.
     public static void Run()
@@ -448,10 +448,12 @@ public static class ImagePadPrimTest
         var args = Environment.GetCommandLineArgs();
         int oi = Array.IndexOf(args, "-imagepadOut");
         string outDir = oi >= 0 ? args[oi + 1] : "ImagePadPrimTest";
+        int di = Array.IndexOf(args, "-imagepadData");
+        string dataName = di >= 0 ? args[di + 1] : "prim-kodim23";
         System.IO.Directory.CreateDirectory(outDir);
         try
         {
-            var json = System.IO.File.ReadAllText("Assets/ImagePadMeasure/TestData/prim-kodim23.json");
+            var json = System.IO.File.ReadAllText($"Assets/ImagePadMeasure/TestData/{dataName}.json");
             int pi = json.IndexOf("\"packets\"");
             var nums = System.Text.RegularExpressions.Regex.Matches(json.Substring(pi), "[0-9]+").Cast<System.Text.RegularExpressions.Match>().Select(m => int.Parse(m.Value)).ToList();
             int nPackets = nums.Count / 32;
@@ -515,7 +517,28 @@ public static class ImagePadPrimTest
                 }
             outTex.SetPixels32(o);
             outTex.Apply();
-            System.IO.File.WriteAllBytes(System.IO.Path.Combine(outDir, "prim-display.png"), outTex.EncodeToPNG());
+            System.IO.File.WriteAllBytes(System.IO.Path.Combine(outDir, $"{dataName}-display.png"), outTex.EncodeToPNG());
+            // display quad (PrimDisplay shader) seen by an orthographic camera: checks the aspect reshaping
+            var dispShader = Shader.Find("ImagePad/PrimDisplay");
+            if (dispShader == null) throw new Exception("PrimDisplay shader missing");
+            var dispMat = new Material(dispShader); dispMat.SetTexture("_Atlas", rtA);
+            var dq = new GameObject("dispquad") { layer = 13 };
+            dq.transform.position = new Vector3(-200, 0, 1);
+            dq.AddComponent<MeshFilter>().sharedMesh = quadMesh;
+            dq.AddComponent<MeshRenderer>().sharedMaterial = dispMat;
+            var viewRt = new RenderTexture(new RenderTextureDescriptor(256, 256, RenderTextureFormat.ARGB32, 16)); viewRt.Create();
+            var vgo = new GameObject("viewcam"); vgo.transform.position = new Vector3(-200, 0, 0);
+            var vcam = vgo.AddComponent<Camera>();
+            vcam.orthographic = true; vcam.orthographicSize = 0.5f; vcam.nearClipPlane = 0.1f; vcam.farClipPlane = 10;
+            vcam.clearFlags = CameraClearFlags.SolidColor; vcam.backgroundColor = Color.magenta; vcam.cullingMask = 1 << 13;
+            vcam.targetTexture = viewRt; vcam.enabled = false; vcam.Render();
+            var view = new Texture2D(256, 256, TextureFormat.RGB24, false);
+            RenderTexture.active = viewRt; view.ReadPixels(new Rect(0, 0, 256, 256), 0, 0); view.Apply(); RenderTexture.active = null;
+            System.IO.File.WriteAllBytes(System.IO.Path.Combine(outDir, $"{dataName}-view.png"), view.EncodeToPNG());
+            int vw = 0, vh = 0;
+            for (int x = 0; x < 256; x++) { var c = view.GetPixel(x, 128); if (!(c.r > 0.9f && c.g < 0.1f && c.b > 0.9f)) vw++; }
+            for (int y = 0; y < 256; y++) { var c = view.GetPixel(128, y); if (!(c.r > 0.9f && c.g < 0.1f && c.b > 0.9f)) vh++; }
+            Debug.Log($"[ImagePad] prim view: aspect code accepted={px[280 * 512 + 4].r} seen={px[280 * 512 + 5].r}, quad {vw}x{vh} px (w/h {(float)vw / vh:F3})");
             // store sanity: count present primitives
             int present = 0;
             for (int j = 0; j < 1003; j++) { int t = 2 * j + 1; var c = px[(256 + t / 512) * 512 + t % 512]; if (((int)Mathf.Round(c.a) & 1) == 1) present++; }

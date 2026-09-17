@@ -157,10 +157,27 @@ function cfgOf(o) {
   return { alpha: 0.5, ...o, col, label };
 }
 
+// ---------------------------------------------------------------------------------------------
+// Aspect ratio metadata (wire level, outside the codec units): the image is stretched to the square
+// R x R canvas and the display un-stretches it. The code rides in the last 8 bits of every packet
+// (unused padding when spareBits(L) >= 8), so it arrives with the first packet of any unit.
+//   code 0 = unknown (treated as 1:1, what older senders send), 1..255: log2(w/h) = (code-1)/254*4-2
+//   (w/h in [1/4, 4], ratio step 1.1 %, error <= 0.55 %; 1:1 = 128, 16:9 = 181, 3:2 = 165, 9:16 = 75).
+function aspectCode(w, h) {
+  const l = Math.max(-2, Math.min(2, Math.log2(w / h)));
+  return 1 + Math.round((l + 2) / 4 * 254);
+}
+function aspectRatio(code) { return code === 0 ? 1 : 2 ** ((code - 1) / 254 * 4 - 2); }
+// unused trailing payload bits of every unit (s=1 layouts)
+function spareBits(L) { return L.s === 1 ? L.pay - Math.max(16 + L.k0 * L.primBits, L.k * L.primBits) : 0; }
+
 module.exports = {
   name: 'prim',
   layout,
   cfgOf,
+  aspectCode,
+  aspectRatio,
+  spareBits,
   configs(B) {
     const c = [];
     const add = o => c.push(cfgOf(o));

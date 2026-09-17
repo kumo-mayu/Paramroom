@@ -1,9 +1,11 @@
 'use strict';
 // Send an image to the ImagePad prim decoder (256 bit = D0..D31) over OSC.
 // usage: node send-image.js <image.png|jpg> [--epoch 1] [--hold 100] [--schedule sqrt|carousel] [--no-bundle]
-//                           [--host 127.0.0.1] [--port 9000] [--duration 0 (=forever)]
-// Encoding: sim/codecs/prim.js config e9.8.6-c565a2-r256-n1000 (centre-cropped, resized to 256x256).
+//                           [--host 127.0.0.1] [--port 9000] [--duration 0 (=forever)] [--fit stretch|crop]
+// Encoding: sim/codecs/prim.js config e9.8.6-c565a2-r256-n1000. --fit stretch (default): the whole image is stretched
+// to 256x256 and its aspect ratio is sent so the display un-stretches it; --fit crop: centre square crop (1:1).
 // Packet: [epoch 2 bits (1..3, never 0)][prim unit 254 bits] -> 32 bytes -> Int parameters D0..D31.
+//         The last byte (D31, unused unit padding) carries prim.aspectCode (0 = unknown = 1:1).
 // Schedule: square-root rule over the units' distortion gains (docs/design/02 §5.1), hold 100 ms, OSC bundle.
 const dgram = require('dgram');
 const path = require('path');
@@ -23,13 +25,16 @@ const scheduleType = opt('schedule', 'sqrt');
 const bundle = !argv.includes('--no-bundle');
 const host = opt('host', '127.0.0.1'), port = Number(opt('port', 9000));
 const duration = Number(opt('duration', 0));
+const fit = opt('fit', 'stretch');
 
-// load + centre square crop + 256x256
+// load + (stretch | centre square crop) to 256x256
 let img = I.loadPNG(path.resolve(file));
-const s = Math.min(img.w, img.h);
-img = I.resize(I.crop(img, (img.w - s) >> 1, (img.h - s) >> 1, s, s), 256, 256);
+const aspect = fit === 'crop' ? prim.aspectCode(1, 1) : prim.aspectCode(img.w, img.h);
+if (fit === 'crop') { const s = Math.min(img.w, img.h); img = I.crop(img, (img.w - s) >> 1, (img.h - s) >> 1, s, s); }
+img = I.resize(img, 256, 256);
 const cfg = prim.configs(256).find(c => c.label === 'e9.8.6-c565a2-r256-n1000');
 const P = 254;
+if (prim.spareBits(prim.layout(cfg, P)) < 8) throw new Error('no spare byte for the aspect code');
 console.log('encoding (primitives)...');
 const t0 = performance.now();
 const enc = prim.encode(img, cfg, P);
@@ -38,6 +43,7 @@ const packets = enc.units.map(u => {
   const bits = [(epoch >> 1) & 1, epoch & 1].concat(padBits(u, P));
   const bytes = [];
   for (let i = 0; i < 32; i++) { let v = 0; for (let k = 0; k < 8; k++) v = (v << 1) | bits[i * 8 + k]; bytes.push(v); }
+  bytes[31] = aspect; // unit padding byte
   return bytes;
 });
 const N = packets.length;
@@ -52,6 +58,7 @@ const send = buf => new Promise(r => sock.send(buf, port, host, r));
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 (async () => {
+  console.log(`aspect code ${aspect} (w/h ${prim.aspectRatio(aspect).toFixed(3)}, fit ${fit})`);
   console.log(`sending: epoch ${epoch}, hold ${hold} ms, schedule ${scheduleType}, ${bundle ? 'OSC bundle' : 'single messages'}. Ctrl+C to stop.`);
   const start = performance.now();
   for (let k = 0; ; k++) {
