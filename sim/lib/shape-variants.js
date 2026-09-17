@@ -36,6 +36,15 @@ const VARIANTS = {
   capdeep: { shape: 'cap', cb: 9, rb: 8, ab: 6, col: [5, 6, 5], aBits: 2, ...DEEP },
   mixdeep: { shape: 'mix', cb: 9, rb: 8, ab: 5, col: [5, 6, 5], aBits: 2, ...DEEP },
   mixsoftdeep: { shape: 'mix', cb: 9, rb: 8, ab: 5, col: [5, 6, 5], aBits: 2, soft: SOFT3, ...DEEP },
+  // --- round 4: re-fitting after the greedy pass (docs/research/08 §15). Encoder only: the format does not change.
+  rf: { shape: 'ell', cb: 9, rb: 8, ab: 6, col: [5, 6, 5], aBits: 2, refine: { sweeps: 2 } },
+  deeprf: { shape: 'ell', cb: 9, rb: 8, ab: 6, col: [5, 6, 5], aBits: 2, ...DEEP, refine: { sweeps: 2 } },
+  capdeeprf: { shape: 'cap', cb: 9, rb: 8, ab: 6, col: [5, 6, 5], aBits: 2, ...DEEP, refine: { sweeps: 2 } },
+  deepsoftrf: { shape: 'ell', cb: 9, rb: 8, ab: 6, col: [5, 6, 5], aBits: 2, soft: SOFT3, ...DEEP, refine: { sweeps: 2 } },
+  // refine.from: leave the first 15 % of the primitives (what the first seconds show) untouched
+  rft: { shape: 'ell', cb: 9, rb: 8, ab: 6, col: [5, 6, 5], aBits: 2, refine: { sweeps: 2, from: 0.15 } },
+  deepsoftrft: { shape: 'ell', cb: 9, rb: 8, ab: 6, col: [5, 6, 5], aBits: 2, soft: SOFT3, ...DEEP, refine: { sweeps: 2, from: 0.15 } },
+  capdeeprft: { shape: 'cap', cb: 9, rb: 8, ab: 6, col: [5, 6, 5], aBits: 2, ...DEEP, refine: { sweeps: 2, from: 0.15 } },
 };
 
 // maxPrims chosen so that every variant uses the same number of units

@@ -140,7 +140,7 @@ function makeGeom(cfg) {
           const du = Math.abs(u) - L, dd = du > 0 ? du : 0;
           const q = (dd * dd + v * v) * iw;
           if (q > qMax) continue;
-          if (wOut) { let ww = 0; for (let t = 0; t < soft.length; t++) if (q <= soft[t][0]) { ww = soft[t][1]; break; } wOut[n] = ww; }
+          if (wOut) { let ww = 1; if (soft) { ww = 0; for (let t = 0; t < soft.length; t++) if (q <= soft[t][0]) { ww = soft[t][1]; break; } } wOut[n] = ww; }
           idx[n++] = row + x;
         }
       }
@@ -158,7 +158,7 @@ function makeGeom(cfg) {
           const u = dx * c + dy * s, v = dy * c - dx * s;
           const q = u * u * irx + v * v * iry;
           if (q > qMax) continue;
-          if (wOut) { let w = 0; for (let t = 0; t < soft.length; t++) if (q <= soft[t][0]) { w = soft[t][1]; break; } wOut[n] = w; }
+          if (wOut) { let w = 1; if (soft) { w = 0; for (let t = 0; t < soft.length; t++) if (q <= soft[t][0]) { w = soft[t][1]; break; } } wOut[n] = w; }
           idx[n++] = row + x;
         }
       }
@@ -211,7 +211,8 @@ function cfgOf(o) {
     : o.shape === 'cap' ? `k${o.cb}.${o.rb}.${o.ab}`
     : o.shape === 'mix' ? `m${o.cb}.${o.rb}.${o.ab}`
     : o.shape === 'tri' ? `t${o.cb}` : `q${o.cb}`;
-  const soft = (o.soft ? '-s' + o.soft.map(([q, w]) => `${q}:${w}`).join('_') : '') + (o.circle ? '-circ' : '') + (o.blend === 'add' ? '-add' : '');
+  const soft = (o.soft ? '-s' + o.soft.map(([q, w]) => `${q}:${w}`).join('_') : '') + (o.circle ? '-circ' : '') + (o.blend === 'add' ? '-add' : '')
+    + (o.refine ? `-rf${o.refine.sweeps || 1}${o.refine.from ? 'f' + o.refine.from : ''}` : '');
   const label = `${geo}-c${col.join('')}a${o.aBits || 0}-r${o.R}-n${o.maxPrims}${soft}`;
   return { alpha: 0.5, ...o, col, label };
 }
@@ -290,6 +291,7 @@ module.exports = {
     for (let i = 0; i < NP * 3; i++) mean[i % 3] += tgt[i] / NP;
     const bg = bg565(mean);
     if (base) cur.set(I.resize(base, R, R).data); else for (let i = 0; i < NP * 3; i++) cur[i] = bg.rgb[i % 3];
+    const initCanvas = cfg.refine ? Float64Array.from(cur) : null; // the canvas every replay starts from
 
     const idx = new Int32Array(NP);
     const wBuf = cfg.soft ? new Float64Array(NP) : null;
@@ -475,6 +477,136 @@ module.exports = {
         if (gain / 20 < stopFrac * sse) {
           target = L.s === 1 ? L.k0 + Math.ceil((j + 1 - L.k0) / L.k) * L.k : j + 1;
         }
+      }
+    }
+
+    // ---- cfg.refine: re-fit each primitive with the ones after it taken into account (docs/research/08 §15)
+    // The greedy pass freezes a primitive the moment it is placed, so it never learns what the later primitives cover.
+    // Here every primitive is re-fitted against the residual that is still visible through the primitives after it:
+    // with P = the canvas before it, and (A, V) = colour and transmittance of everything after it (final = A + V*B),
+    // the error is sum (e - a u (c - P))^2 with e = T - A - V*P and u = V * (soft weight). That is exactly the closed
+    // form the encoder already solves, so the same candidate search can be reused.
+    if (cfg.refine && prims.length) {
+      const sweeps = cfg.refine.sweeps || 1, iters = cfg.refine.iters || 300, age0 = cfg.refine.age || 50;
+      const rebuildEvery = cfg.refine.rebuild || 128;   // exact rebuild of (A, V) to stop rounding from drifting
+      const P = new Float64Array(cur.length);           // canvas before the primitive being re-fitted
+      const A = new Float64Array(cur.length);           // colour of the primitives after it
+      const V = new Float64Array(NP);                   // transmittance of the primitives after it
+      const idx2 = new Int32Array(NP), w2 = new Float64Array(NP), g2 = new Float64Array(6);
+      const rgbOf = p => add
+        ? [addVal(p.r[1], crb, vmax), addVal(p.r[2], cgb, vmax), addVal(p.r[3], cbb, vmax)]
+        : [colVal(p.r[1], crb), colVal(p.r[2], cgb), colVal(p.r[3], cbb)];
+      const applyPrim = (canvas, p) => {
+        G.geom(p.codes, g2);
+        const n = G.raster(g2, idx2, 1, w2);
+        if (add) blendAdd(canvas, idx2, n, rgbOf(p), cfg.soft ? w2 : null);
+        else blend(canvas, idx2, n, rgbOf(p), alphas[p.r[0]], cfg.soft ? w2 : null);
+      };
+      // (A, V) of the primitives after index i, built exactly: walking backwards, primitive j goes UNDER what is
+      // already accumulated:  A += V * c_j * a_j ;  V *= (1 - a_j)
+      const suffixUnder = (p, Aarr, Varr) => {
+        G.geom(p.codes, g2);
+        const n = G.raster(g2, idx2, 1, w2);
+        const rgb = rgbOf(p), a0 = alphas[p.r[0]];
+        for (let t = 0; t < n; t++) {
+          // alpha 1 is treated as 0.999 so that the incremental removal below stays exact
+          const px = idx2[t], o = px * 3, a = Math.min(0.999, a0 * (cfg.soft ? w2[t] : 1));
+          for (let ch = 0; ch < 3; ch++) Aarr[o + ch] += Varr[px] * rgb[ch] * a;
+          Varr[px] *= 1 - a;
+        }
+      };
+      const rebuildSuffix = from => {
+        A.fill(0); V.fill(1);
+        for (let j = prims.length - 1; j >= from; j--) suffixUnder(prims[j], A, V);
+      };
+      // score a candidate against (P, A, V): same sums as scoreSums, with canvas P, residual e and weight u
+      const S2 = new Float64Array(15);
+      function scoreRefine(n, out) {
+        S2.fill(0);
+        let base = 0;
+        for (let t = 0; t < n; t++) {
+          const px = idx[t], o = px * 3, u = V[px] * (wBuf ? wBuf[t] : 1), uu = u * u;
+          for (let ch = 0; ch < 3; ch++) {
+            const p = P[o + ch], e = tgt[o + ch] - A[o + ch] - V[px] * p, b = ch * 5;
+            S2[b] += u * e; S2[b + 1] += u * e * p; S2[b + 2] += uu; S2[b + 3] += uu * p; S2[b + 4] += uu * p * p;
+            base += e * e;
+          }
+        }
+        let best = Infinity;
+        for (let q = 0; q < nAlpha; q++) {
+          const a = alphas[q];
+          let tot = 0;
+          const cc = [0, 0, 0];
+          for (let ch = 0; ch < 3; ch++) {
+            const b = ch * 5, S1 = S2[b], Sp = S2[b + 1], S3 = S2[b + 2], S4 = S2[b + 3], S5 = S2[b + 4];
+            if (S3 <= 1e-12) { cc[ch] = 0; continue; }
+            let col = S1 / (a * S3) + S4 / S3;
+            col = col < 0 ? 0 : col > 255 ? 255 : col;
+            const lv = cLv[ch], qc = Math.round(col / 255 * lv), v = qc * 255 / lv;
+            cc[ch] = qc;
+            tot += -2 * v * a * S1 + 2 * a * Sp + v * v * a * a * S3 - 2 * v * a * a * S4 + a * a * S5;
+          }
+          if (tot < best) { best = tot; out[0] = q; out[1] = cc[0]; out[2] = cc[1]; out[3] = cc[2]; }
+        }
+        return best; // change of the FINAL squared error (negative = better); 'base' is the same for every alpha
+      }
+      const evalRefine = (codes, out) => {
+        G.geom(codes, g);
+        const n = G.raster(g, idx, 1, wBuf);
+        if (n === 0) { out[0] = out[1] = out[2] = out[3] = 0; return 0; }
+        return scoreRefine(n, out);
+      };
+      // cfg.refine.from: leave the first fraction of the primitives alone. Re-fitting improves the FINAL image but
+      // can make the first seconds very slightly worse, so the early (most visible) primitives can be kept as they are.
+      const firstKept = Math.round((cfg.refine.from || 0) * prims.length);
+      for (let sweep = 0; sweep < sweeps; sweep++) {
+        P.set(initCanvas);
+        rebuildSuffix(1);                       // (A, V) for the primitives after index 0
+        for (let i = 0; i < prims.length; i++) {
+          if (i > 0) {
+            if (i % rebuildEvery === 0) rebuildSuffix(i + 1);
+            else {
+              // the suffix loses primitive i: undo its "under" step
+              G.geom(prims[i].codes, g2);
+              const n = G.raster(g2, idx2, 1, w2);
+              const rgb = rgbOf(prims[i]), a0 = alphas[prims[i].r[0]];
+              for (let t = 0; t < n; t++) {
+                const px = idx2[t], o = px * 3, a = Math.min(0.999, a0 * (cfg.soft ? w2[t] : 1));
+                V[px] /= 1 - a;
+                for (let ch = 0; ch < 3; ch++) A[o + ch] -= V[px] * rgb[ch] * a;
+              }
+            }
+          }
+          if (i >= firstKept) {
+            const c = { codes: prims[i].codes.slice(), d: 0, r: prims[i].r.slice() };
+            c.d = evalRefine(c.codes, c.r);
+            for (let a2 = 0, it = 0; a2 < age0 && it < iters; it++) {
+              mutate(c.codes, trial);
+              const d = evalRefine(trial, tr);
+              if (d < c.d) { c.codes.set(trial); c.d = d; c.r.set(tr); a2 = 0; } else a2++;
+            }
+            prims[i] = c;
+          }
+          applyPrim(P, prims[i]);               // the prefix of the next primitive
+        }
+      }
+      // replay to get the real per-primitive gains (the send order uses them) and the final canvas
+      cur.set(initCanvas);
+      for (let i = 0; i < prims.length; i++) {
+        G.geom(prims[i].codes, g2);
+        const n = G.raster(g2, idx2, 1, w2);
+        const rgb = rgbOf(prims[i]), a0 = alphas[prims[i].r[0]];
+        let d = 0;
+        for (let t = 0; t < n; t++) {
+          const o = idx2[t] * 3, a = a0 * (cfg.soft ? w2[t] : 1);
+          for (let ch = 0; ch < 3; ch++) {
+            const c0 = cur[o + ch], t0 = tgt[o + ch];
+            const nc = add ? c0 + rgb[ch] * (cfg.soft ? w2[t] : 1) : c0 * (1 - a) + rgb[ch] * a;
+            d += (t0 - nc) * (t0 - nc) - (t0 - c0) * (t0 - c0);
+            cur[o + ch] = nc;
+          }
+        }
+        hist[i] = -Math.min(0, d);
       }
     }
 
