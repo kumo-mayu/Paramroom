@@ -13,8 +13,11 @@
 //                   (4 bytes per texel, value 0..255 exact in half); present flag = byte 7 bit 0
 //   control         y = 280: x0 = pass counter (mod batch count), x1 = epoch, x2 = bg present, x3 = bg RGB 0..255,
 //                   x4 = accepted aspect code, x5 = aspect code of the previous valid packet
-// Aspect code = last packet byte (_P31, unit padding; sim/codecs/prim.js aspectCode, 0 = 1:1). It is accepted only when
-// two consecutive valid packets agree, so a single torn packet cannot change the display shape; reset -> 0.
+// Aspect code = last packet byte (_P31, unit padding; sim/codecs/prim.js aspectCode, 0 = 1:1). It is accepted when two
+// consecutive loop passes see the same value; reset -> 0. NOTE: a synced value is held for many passes (2 per frame,
+// ~6 frames per packet), so this is only a one-pass delay, not protection against torn packets. Within an epoch every
+// packet carries the same code, so a torn packet can only show the previous image's shape at an epoch change, for at
+// most one packet (~100 ms) while the canvas is being reset anyway (VRChat test 2026-09-17, docs/measure).
 // Every texel only depends on the previous buffer and the current packet => idempotent, order independent.
 Shader "ImagePad/PrimDecoder"
 {

@@ -1,0 +1,13 @@
+start kodim04 unix 1789632126009
+encoding (primitives)...
+encoded 251 units in 3.8 s
+aspect code 91 (w/h 0.668, fit stretch)
+sending: epoch 1, hold 100 ms, schedule sqrt, OSC bundle. Ctrl+C to stop.
+0 packets sent (0 s)   50 packets sent (5 s)   100 packets sent (10 s)   150 packets sent (15 s)   200 packets sent (20 s)   250 packets sent (25 s)   300 packets sent (30 s)   350 packets sent (35 s)   400 packets sent (40 s)   
+start kodim23 unix 1789632170273
+encoding (primitives)...
+encoded 251 units in 3.9 s
+aspect code 165 (w/h 1.498, fit stretch)
+sending: epoch 2, hold 100 ms, schedule sqrt, OSC bundle. Ctrl+C to stop.
+0 packets sent (0 s)   50 packets sent (5 s)   100 packets sent (10 s)   150 packets sent (15 s)   200 packets sent (20 s)   250 packets sent (25 s)   300 packets sent (30 s)   350 packets sent (35 s)   400 packets sent (40 s)   450 packets sent (45 s)   500 packets sent (50 s)   550 packets sent (55 s)   600 packets sent (60 s)   650 packets sent (65 s)   700 packets sent (70 s)   750 packets sent (75 s)   800 packets sent (80 s)   850 packets sent (85 s)   900 packets sent (90 s)   950 packets sent (95 s)   1000 packets sent (100 s)   1050 packets sent (105 s)   1100 packets sent (110 s)   1150 packets sent (115 s)   1200 packets sent (120 s)   1250 packets sent (125 s)   1300 packets sent (130 s)   1350 packets sent (135 s)   1400 packets sent (140 s)   1450 packets sent (145 s)   1500 packets sent (150 s)   
+end unix 1789632324584
