@@ -1,7 +1,7 @@
 'use strict';
 // Visual comparison sheets of the prim codec over canvas size (256/512/1024) and primitive count (1000/2000/4000).
 //   node make-comparison.js encode <image> <R> <n>   -> cache/compare/<image>-r<R>-n<n>.png (render at R, true aspect not applied)
-//   node make-comparison.js sheets <outDir>           -> <outDir>/<image>-overview.png, <image>-zoom.png
+//   node make-comparison.js sheets <outDir> [R/n,R/n,...] -> <outDir>/<image>-overview.png, <image>-zoom.png (default: all configs)
 // Images: screenshot_mahara (whole page 960x847, stretched to the square canvas as sent in VRChat),
 //         illust_chibi (top 960x960 square), kodim23 (centre 512x512 square; 1024 is upsampled from 512).
 // Coordinates: 9 bit up to R=512, 10 bit at R=1024 (2 px steps otherwise).
@@ -39,6 +39,7 @@ if (cmd === 'encode') {
   console.log(`${image} R${R} n${n}: ${enc.units.length} units, ${((Date.now() - t0) / 1000).toFixed(0)} s`);
 } else if (cmd === 'sheets') {
   const outDir = path.resolve(a1);
+  const configs = a2 ? a2.split(',').map(c => c.split('/').map(Number)) : CONFIGS;
   fs.mkdirSync(outDir, { recursive: true });
   const ffmpeg = require('../measure/analysis/node_modules/ffmpeg-static'); // installed with the measurement tools
   const tmp = path.join(cacheDir, 'tiles');
@@ -48,7 +49,7 @@ if (cmd === 'encode') {
     const src = srcOf(image);
     const [W, H] = displaySize(src);
     const tiles = [{ img: I.resize(src, W, H), label: '元画像' }];
-    for (const [R, n] of CONFIGS) {
+    for (const [R, n] of configs) {
       const f = path.join(cacheDir, `${image}-r${R}-n${n}.png`);
       const [units] = fs.readFileSync(f.replace(/\.png$/, '.txt'), 'utf8').split(' ');
       const now = R === 256 && n === 1000 ? '・最初の実機版' : '';
