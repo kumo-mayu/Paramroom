@@ -1,6 +1,6 @@
 // imagepad: prim encoder + OSC sender for the ImagePad avatar decoder (C# port of measure/osc/send-image.js).
 //
-//   imagepad send   <image> [--fit stretch|crop] [--epoch 1] [--schedule sqrt|fast|carousel] [--hold 100] [--duration 0]
+//   imagepad send   <image> [--fit stretch|crop] [--epoch 1] [--schedule fast+sqrt/8(default)|sqrt|fast|fast+sqrtB/k|fast+baseB/k|carousel] [--hold 100] [--duration 0]
 //                           [--client <name part | OSC port>] [--wait 3] [--R 512 --n 4000] [--force] [--seed N]
 //                           [--host 127.0.0.1 --port 9000] [--no-bundle]
 //   imagepad send   --units units.json [...]                  (send a previously encoded image)
@@ -20,7 +20,7 @@ using ImagePad;
 var argv = args.ToList();
 if (argv.Count == 0 || (argv[0] != "send" && argv[0] != "encode" && argv[0] != "list"))
 {
-    Console.WriteLine("usage: imagepad send|encode|list [<image>] [--units units.json] [--fit stretch|crop] [--epoch 1] [--schedule sqrt|fast|carousel] [--client name|port] [--R 512 --n 4000] [--out units.json] [--png out.png]");
+    Console.WriteLine("usage: imagepad send|encode|list [<image>] [--units units.json] [--fit stretch|crop] [--epoch 1] [--schedule fast+sqrt/8(default)|sqrt|fast|fast+sqrtB/k|fast+baseB/k|carousel] [--client name|port] [--R 512 --n 4000] [--out units.json] [--png out.png]");
     return 1;
 }
 string cmd = argv[0];
@@ -135,7 +135,7 @@ if (cmd == "send")
     // present get more detail sooner, e.g. 512/4000 at 10 s 0.892 vs 0.871), then the square-root rule; carousel: units in
     // order, repeated. sim/results/fastfirst.md: fast is worse for viewers joining during the first pass (N x 100 ms).
     // also the first-pass variants of sim/lib/schedules-ff.js: fast+sqrt/k, fast+sqrtB/k, fast+baseB/k
-    string sched = Opt("schedule") ?? "sqrt";
+    string sched = Opt("schedule") ?? "fast+sqrt/8"; // default chosen from measure/results/2026-09-17/fastfirst (2026-09-17)
     Func<int, int> schedule;
     var m = System.Text.RegularExpressions.Regex.Match(sched, @"^fast\+(sqrt|base)(\d*)/(\d+)$");
     if (sched == "sqrt") { var s = new SqrtSchedule(gains); schedule = k => s[k]; }
