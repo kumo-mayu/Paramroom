@@ -1,13 +1,12 @@
 // ImagePad primitive decoder prefab builder (prototype).
 //
 // Window: Tools/ImagePad/Prim Decoder Builder
-//   - pick the decoder format (256/1000, 512/2000, 512/4000, light 512/4000 and 512/5000) and the number of synced Int
+//   - pick the decoder format (512/4000, light 512/4000, light 512/5000) and the number of synced Int
 //     parameters D0..D(B-1)
 //   - only the "good" Int counts are offered: the smallest count for each number of primitives per packet (more Ints
 //     between two good counts would only add padding)
 //   - with an avatar selected, shows its synced bits used by everything else (NDMF ParameterInfo, the same source as the
 //     Modular Avatar "Parameter Usage" window) and marks which counts fit into the free space
-// Menus (32 Int, as before): Tools/ImagePad/Build Prim Decoder Prefab (256 bit[, 512 canvas, 2000|4000])
 //
 // A prefab contains:
 //   - two ARGBHalf atlas RenderTextures, 512x288 / 1024x536 (double-buffered camera loop, see ImagePadPrimDecoder.shader)
@@ -26,7 +25,7 @@ using UnityEngine;
 
 public static class ImagePadPrimBuilder
 {
-    const string Root = "Assets/ImagePadMeasure";
+    const string Root = "Assets/ImagePad";
     const int LoopLayer = 12;
 
     // format id (ImagePad_Format) -> canvas, primitives requested (the layout rounds up to whole units) and the bits of
@@ -39,10 +38,10 @@ public static class ImagePadPrimBuilder
         public float far;  // unique loop camera far plane per format
         public int PrimBits => 2 * cb + 2 * rb + ab + cr + cg + cbl + abits;
     }
+    // Formats 1 (256/1000) and 2 (512/2000) are no longer built (2026-09-17: 512 canvas with 4000+ primitives is the base);
+    // the sender still supports avatars that have them.
     public static readonly Dictionary<int, Format> Formats = new()
     {
-        [1] = new Format { canvas = 256, prims = 1000, cb = 9, rb = 8, ab = 6, cr = 5, cg = 6, cbl = 5, abits = 2, name = "256/1000", prefab = "ImagePadPrimDecoder", far = 0.0237f },
-        [2] = new Format { canvas = 512, prims = 2000, cb = 9, rb = 8, ab = 6, cr = 5, cg = 6, cbl = 5, abits = 2, name = "512/2000", prefab = "ImagePadPrimDecoder512n2000", far = 0.0257f },
         [3] = new Format { canvas = 512, prims = 4000, cb = 9, rb = 8, ab = 6, cr = 5, cg = 6, cbl = 5, abits = 2, name = "512/4000", prefab = "ImagePadPrimDecoder512", far = 0.0247f },
         [4] = new Format { canvas = 512, prims = 4000, cb = 8, rb = 6, ab = 5, cr = 4, cg = 4, cbl = 4, abits = 2, name = "512/4000 軽量", prefab = "ImagePadPrimDecoder512Light", far = 0.0267f },
         [5] = new Format { canvas = 512, prims = 5000, cb = 8, rb = 6, ab = 5, cr = 4, cg = 4, cbl = 4, abits = 2, name = "512/5000 軽量", prefab = "ImagePadPrimDecoder512Light5000", far = 0.0277f },
@@ -88,15 +87,6 @@ public static class ImagePadPrimBuilder
         int w = 2 * f.canvas;
         return Math.Max(8192, (2 * l.maxPrims + w - 1) / w * w);
     }
-
-    [MenuItem("Tools/ImagePad/Build Prim Decoder Prefab (256 bit)")]
-    public static void Build() => Build(1, 32);
-
-    [MenuItem("Tools/ImagePad/Build Prim Decoder Prefab (256 bit, 512 canvas, 2000)")]
-    public static void Build512n2000() => Build(2, 32);
-
-    [MenuItem("Tools/ImagePad/Build Prim Decoder Prefab (256 bit, 512 canvas, 4000)")]
-    public static void Build512() => Build(3, 32);
 
     public static string PrefabName(int formatId, int bytes) => bytes == 32 ? Formats[formatId].prefab : $"{Formats[formatId].prefab}_{bytes}int";
 
@@ -214,8 +204,8 @@ public static class ImagePadPrimBuilder
         var layers = ctrl.layers; layers[0].name = "ImagePadPrimDecoder"; layers[0].defaultWeight = 1; ctrl.layers = layers;
         EditorUtility.SetDirty(ctrl);
 
-        ImagePadMeasureBuilder.AddMergeAnimator(root, ctrl);
-        ImagePadMeasureBuilder.AddParameters(root, bytes, formatId);
+        ImagePadModularAvatar.AddMergeAnimator(root, ctrl);
+        ImagePadModularAvatar.AddParameters(root, bytes, formatId);
         string prefabPath = $"{Root}/{prefabName}.prefab";
         PrefabUtility.SaveAsPrefabAsset(root, prefabPath);
         UnityEngine.Object.DestroyImmediate(root);
