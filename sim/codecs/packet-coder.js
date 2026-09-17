@@ -144,6 +144,7 @@ function encodeStream(layout, tab, q, cap, opts = {}) {
   return { runs, baseRuns, spans };
 }
 
+// opts.known (optional Uint8Array): set to 1 for every dense position written (used for concealment)
 function decodeRun(layout, tab, q, bits, opts = {}) {
   const addr = addressing(layout, opts.idxMax);
   const r = new BitReader(bits);
@@ -167,7 +168,7 @@ function decodeRun(layout, tab, q, bits, opts = {}) {
         const d = r.readSEG(ctx.k('dc', gi));
         ctx.update('dc', gi, segMag(d));
         const v = (prevGi === gi ? prev : 0) + d;
-        q[pos] = v; prev = v; prevGi = gi; pos++; gapIsPadding = false;
+        q[pos] = v; prev = v; prevGi = gi; if (opts.known) opts.known[pos] = 1; pos++; gapIsPadding = false;
       } else {
         const run = r.readEG(ctx.k('run', gi));
         ctx.update('run', gi, run);

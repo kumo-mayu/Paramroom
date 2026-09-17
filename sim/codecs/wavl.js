@@ -66,21 +66,44 @@ function quantizePlanes(spatial, layout, cfg, gains) {
 }
 
 // returns 3 zero-centred spatial planes
-function reconstructPlanes(q, layout) {
+// known (optional): Uint8Array over stream positions; unknown dense (layer-0 LL) coefficients are concealed with the
+// mean of known 8-neighbours (display only, the state q is untouched) — PZW-style concealment.
+function reconstructPlanes(q, layout, known) {
   const coefs = [0, 1, 2].map(() => new Float64Array(SIZE * SIZE));
   for (const g of layout.groups) {
     const dst = coefs[g.ch], sb = g.sb;
+    let vals = null;
+    if (known && g.dense) {
+      vals = new Float64Array(sb.w * sb.h);
+      const k = new Uint8Array(sb.w * sb.h);
+      for (let i = 0; i < vals.length; i++) { vals[i] = q[g.start + i]; k[i] = known[g.start + i]; }
+      for (let pass = 0; pass < 4; pass++) {
+        const add = [];
+        for (let y = 0; y < sb.h; y++)
+          for (let x = 0; x < sb.w; x++) {
+            if (k[y * sb.w + x]) continue;
+            let s = 0, n = 0;
+            for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+              const X = x + dx, Y = y + dy;
+              if ((dx || dy) && X >= 0 && Y >= 0 && X < sb.w && Y < sb.h && k[Y * sb.w + X]) { s += vals[Y * sb.w + X]; n++; }
+            }
+            if (n) add.push([y * sb.w + x, s / n]);
+          }
+        if (!add.length) break;
+        for (const [i, v] of add) { vals[i] = v; k[i] = 1; }
+      }
+    }
     for (let y = 0; y < sb.h; y++)
       for (let x = 0; x < sb.w; x++) {
-        const v = q[g.start + y * sb.w + x];
+        const v = vals ? vals[y * sb.w + x] : q[g.start + y * sb.w + x];
         if (v) dst[(sb.y + y) * SIZE + sb.x + x] += v * g.step;
       }
   }
   return coefs.map(c => W.inv2d(c));
 }
 
-function reconstruct(q, layout) {
-  const [Y, Cb, Cr] = reconstructPlanes(q, layout).map(p => {
+function reconstruct(q, layout, known) {
+  const [Y, Cb, Cr] = reconstructPlanes(q, layout, known).map(p => {
     for (let i = 0; i < p.length; i++) p[i] += 128;
     return { w: SIZE, h: SIZE, c: 1, data: p };
   });
@@ -104,22 +127,27 @@ module.exports = {
   configs(B) {
     const sets = B >= 128 ? [[24, 6], [48, 12], [48, 16, 5]] : B >= 64 ? [[48, 12], [96, 24], [96, 32, 10]] : [[96, 24], [192, 48], [192, 64, 20]];
     const idxMax = B >= 128 ? 10 : 8;
-    return sets.map(steps => ({ label: `L${steps.join('-')}`, steps, chromaW: 2, chromaDrop: 1, dz: 0.2, idxMax, adapt: false }));
+    const out = [];
+    for (const conceal of [false, true])
+      for (const steps of sets) out.push({ label: `L${steps.join('-')}${conceal ? '-cc' : ''}`, steps, chromaW: 2, chromaDrop: 1, dz: 0.2, idxMax, adapt: false, conceal });
+    return out;
   },
   encode(ref, cfg, P) {
     const { layout, tab } = setup(cfg);
     const gains = new Float64Array(layout.total);
     const q = quantize(ref, layout, cfg, gains);
     const { runs, spans } = PC.encodeStream(layout, tab, q, P, cfg);
-    return { units: W.rdOrder(spans, gains).map(i => runs[i]), baseCount: 0 };
+    const { order, runGains } = W.rdOrderWithGains(spans, gains);
+    return { units: order.map(i => runs[i]), gains: order.map(i => runGains[i]), baseCount: 0 };
   },
   decoder(cfg, P) {
     const { layout, tab } = setup(cfg);
     const q = new Int32Array(layout.total);
+    const known = cfg.conceal ? new Uint8Array(layout.total) : null;
     return {
       stateInfo: `coef textures ${cfg.steps.length} layers x ${SIZE}^2 x 3 (${layout.total} values)`,
-      apply(bits) { PC.apply(layout, tab, q, bits, cfg); },
-      render() { return reconstruct(q, layout); },
+      apply(bits) { PC.apply(layout, tab, q, bits, { ...cfg, known }); },
+      render() { return reconstruct(q, layout, known); },
     };
   },
 };

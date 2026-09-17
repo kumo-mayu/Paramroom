@@ -114,7 +114,7 @@ module.exports = {
     // CH_W weights make the residual gain approximate RGB-SSE per channel => multiply by 3 to compare.
     runs.forEach((r, i) => items.push({ bits: withType(1, r), gain: 3 * (pre[spans[i][1]] - pre[spans[i][0]]), ord: 1e6 + i }));
     items.sort((a, b) => b.gain - a.gain || a.ord - b.ord);
-    return { units: items.map(x => x.bits), baseCount: 0 };
+    return { units: items.map(x => x.bits), gains: items.map(x => (Number.isFinite(x.gain) ? x.gain : NaN)), baseCount: 0 };
   },
   decoder(cfg, P) {
     const pcfg = primCfg(cfg);

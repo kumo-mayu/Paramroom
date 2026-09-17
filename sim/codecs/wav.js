@@ -160,10 +160,14 @@ function reconstruct(q, layout, cfg) {
 
 // Sort runs by distortion reduction (descending). spans: [start,end) positions per run.
 function rdOrder(spans, gains) {
+  return rdOrderWithGains(spans, gains).order;
+}
+// returns { order, runGains } (runGains indexed by run, not by order)
+function rdOrderWithGains(spans, gains) {
   const pre = new Float64Array(gains.length + 1);
   for (let i = 0; i < gains.length; i++) pre[i + 1] = pre[i] + gains[i];
   const g = spans.map(([a, b]) => pre[b] - pre[a]);
-  return g.map((v, i) => i).sort((i, j) => g[j] - g[i] || i - j);
+  return { order: g.map((v, i) => i).sort((i, j) => g[j] - g[i] || i - j), runGains: g };
 }
 
 const cache = new Map();
@@ -179,7 +183,7 @@ function setup(cfg) {
 
 module.exports = {
   name: 'wav',
-  _internal: { fwd2d, inv2d, norms, subbands, setup, quantize, reconstruct, rdOrder },
+  _internal: { fwd2d, inv2d, norms, subbands, setup, quantize, reconstruct, rdOrder, rdOrderWithGains },
   configs(B) {
     const steps = B >= 128 ? [6, 12, 24] : B >= 64 ? [12, 24, 48] : [24, 48, 96];
     const idxMax = B >= 128 ? 10 : 8;

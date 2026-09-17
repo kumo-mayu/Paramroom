@@ -58,6 +58,16 @@ const GRIDS = {
     policy: [{ type: 'carousel' }, { type: 'tier' }, { type: 'prio', period: 4, base: 8, label: 'prio4b8' }],
     capSeconds: [30, 90], times: TIMES, seeds: 6,
   },
+  // literature candidates: square-root-rule schedules vs current policies (measured channel, OSC bundle)
+  lit: {
+    channels: [{ name: 'm100b', sampler: 'meas60', H: 0.1, torn: 0.007 }],
+    join: [0, 'rand'],
+    policy: [
+      { type: 'carousel' }, { type: 'tier' }, { type: 'prio', period: 4, base: 8, label: 'prio4b8' },
+      { type: 'sqrt', alpha: 0, label: 'sqrt' }, { type: 'sqrt', alpha: 0.3, label: 'sqrt30' }, { type: 'sqrt', alpha: 0.6, label: 'sqrt60' },
+    ],
+    capSeconds: [30, 90], times: TIMES, seeds: 6,
+  },
   // CRC comparison for B=32 (CRC-8 does not fit most codecs)
   crc32: {
     channels: [{ name: 'bm14', sampler: 'bmfit', H: 0.14 }, { name: 'bm14torn', sampler: 'bmfit', H: 0.14, torn: 0.05 }],
@@ -118,7 +128,7 @@ function evaluateTask({ codec: codecName, cfg, B, image, crcBits = 0, grid: grid
       const baseCount = Math.min(Math.max(enc.baseCount || 0, Math.ceil(N * 0.1)), N);
       for (const policy of grid.policy) {
         // codecs may impose their own schedule (e.g. dual-stream); rows keep the grid policy label
-        const schedule = enc.schedule ? T.makeSchedule(N, enc.schedule, enc.baseCount) : T.makeSchedule(N, policy, policy.base || baseCount);
+        const schedule = enc.schedule ? T.makeSchedule(N, enc.schedule, enc.baseCount) : T.makeSchedule(N, policy, policy.base || baseCount, enc.gains ? enc.gains.slice(0, N) : null);
         for (const join of grid.join) {
           for (let seed = 1; seed <= grid.seeds; seed++) {
             const joinT = join === 'rand' ? 20 + 60 * T.mulberry32(seed * 104729 + 7)() : join;

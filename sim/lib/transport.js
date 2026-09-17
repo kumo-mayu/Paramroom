@@ -36,7 +36,38 @@ function gauss(rnd) {
 //            shifts the phase every cycle so a periodic sampler cannot miss the same units forever.
 //  prio:     every `period`-th slot re-sends a unit from the base set [0, baseCount) (cyclic);
 //            the other slots run the carousel above.
-function makeSchedule(N, policy = { type: 'carousel' }, baseCount = 1) {
+//  sqrt:     broadcast-scheduling square-root rule (Ammar & Wong; Vaidya & Hameed): unit i is sent with frequency
+//            p_i ∝ sqrt(gain_i / size_i) (size = 1 packet), mixed with a uniform share alpha, realised deterministically
+//            by stride scheduling (send the unit with the smallest pass value, then pass += 1/p_i).
+function sqrtSchedule(N, gains, alpha) {
+  const g = Array.from({ length: N }, (_, i) => (gains && Number.isFinite(gains[i]) ? Math.max(gains[i], 0) : NaN));
+  const finite = g.filter(v => Number.isFinite(v) && v > 0);
+  const maxG = finite.length ? Math.max(...finite) : 1, minG = finite.length ? Math.min(...finite) : 1;
+  const f = g.map(v => Math.sqrt(Number.isNaN(v) ? 2 * maxG : Math.max(v, minG * 1e-3)));
+  const sum = f.reduce((a, b) => a + b, 0);
+  const p = f.map(v => (1 - alpha) * v / sum + alpha / N);
+  const pass = new Float64Array(N), stride = p.map(v => 1 / v);
+  const seq = [];
+  // simple binary heap on (pass, index)
+  const heap = Array.from({ length: N }, (_, i) => i);
+  const less = (a, b) => pass[a] < pass[b] || (pass[a] === pass[b] && a < b);
+  const down = i => { for (;;) { const l = 2 * i + 1, r = l + 1; let m = i; if (l < N && less(heap[l], heap[m])) m = l; if (r < N && less(heap[r], heap[m])) m = r; if (m === i) return; [heap[i], heap[m]] = [heap[m], heap[i]]; i = m; } };
+  // initial passes: stride/2 so that high-frequency units start early, ties broken by gain order (index)
+  for (let i = 0; i < N; i++) pass[i] = stride[i] / 2;
+  for (let i = (N >> 1) - 1; i >= 0; i--) down(i);
+  return k => {
+    while (seq.length <= k) {
+      const u = heap[0];
+      seq.push(u);
+      pass[u] += stride[u];
+      down(0);
+    }
+    return seq[k];
+  };
+}
+
+function makeSchedule(N, policy = { type: 'carousel' }, baseCount = 1, gains = null) {
+  if (policy.type === 'sqrt') return sqrtSchedule(N, gains, policy.alpha || 0);
   const base = Math.max(1, Math.min(baseCount, N));
   const carousel = k => {
     const c = Math.floor(k / (N + 1)), i = k % (N + 1);
@@ -162,4 +193,4 @@ function crc(bits, c) {
   return r;
 }
 
-module.exports = { EPOCH_BITS, LATENCY, makeSchedule, arrivals, mulberry32, crc, sampleTimes };
+module.exports = { EPOCH_BITS, LATENCY, makeSchedule, sqrtSchedule, arrivals, mulberry32, crc, sampleTimes };
