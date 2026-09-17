@@ -19,17 +19,17 @@ public static class Aspect
 
 public static class Packets
 {
-    // [epoch 2][unit P bits] -> 32 bytes, last byte = aspect code (unit padding)
-    public static byte[][] Build(IReadOnlyList<bool[]> units, int epoch, int aspect)
+    // [epoch 2][unit P = 8*nBytes-2 bits] -> nBytes bytes (= synced Int parameters), last byte = aspect code (unit padding)
+    public static byte[][] Build(IReadOnlyList<bool[]> units, int epoch, int aspect, int nBytes)
     {
         return units.Select(u =>
         {
-            var bits = new bool[256];
+            var bits = new bool[8 * nBytes];
             bits[0] = ((epoch >> 1) & 1) == 1; bits[1] = (epoch & 1) == 1;
-            Array.Copy(u, 0, bits, 2, Math.Min(u.Length, 254));
-            var bytes = new byte[32];
-            for (int i = 0; i < 32; i++) { int v = 0; for (int k = 0; k < 8; k++) v = (v << 1) | (bits[i * 8 + k] ? 1 : 0); bytes[i] = (byte)v; }
-            bytes[31] = (byte)aspect;
+            Array.Copy(u, 0, bits, 2, Math.Min(u.Length, 8 * nBytes - 2));
+            var bytes = new byte[nBytes];
+            for (int i = 0; i < nBytes; i++) { int v = 0; for (int k = 0; k < 8; k++) v = (v << 1) | (bits[i * 8 + k] ? 1 : 0); bytes[i] = (byte)v; }
+            bytes[nBytes - 1] = (byte)aspect;
             return bytes;
         }).ToArray();
     }
@@ -86,12 +86,12 @@ public static class OscSender
     static void Str(List<byte> b, string s) { b.AddRange(Encoding.ASCII.GetBytes(s)); b.Add(0); while (b.Count % 4 != 0) b.Add(0); }
     static void Int(List<byte> b, int v) { b.Add((byte)(v >> 24)); b.Add((byte)(v >> 16)); b.Add((byte)(v >> 8)); b.Add((byte)v); }
 
-    // one OSC bundle with /avatar/parameters/D0..D31 ,i
+    // one OSC bundle with /avatar/parameters/D0..D(n-1) ,i
     public static byte[] Bundle(byte[] packet)
     {
         var b = new List<byte>(1400);
         Str(b, "#bundle"); b.AddRange(new byte[] { 0, 0, 0, 0, 0, 0, 0, 1 });
-        for (int i = 0; i < 32; i++)
+        for (int i = 0; i < packet.Length; i++)
         {
             var m = new List<byte>(40);
             Str(m, $"/avatar/parameters/D{i}"); Str(m, ",i"); Int(m, packet[i]);
@@ -105,7 +105,7 @@ public static class OscSender
         using var udp = new UdpClient();
         udp.Connect(host, port);
         var bundles = packets.Select(Bundle).ToArray();
-        var singles = bundle ? null : packets.Select(p => Enumerable.Range(0, 32).Select(i =>
+        var singles = bundle ? null : packets.Select(p => Enumerable.Range(0, p.Length).Select(i =>
         {
             var m = new List<byte>(); Str(m, $"/avatar/parameters/D{i}"); Str(m, ",i"); Int(m, p[i]); return m.ToArray();
         }).ToArray()).ToArray();

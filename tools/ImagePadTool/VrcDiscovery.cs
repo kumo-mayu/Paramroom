@@ -8,7 +8,7 @@ namespace ImagePad;
 
 public sealed record VrcClient(string Name, string OscIp, int OscPort, string? AvatarId, int ImagePadParams, int? Format, string? Problem)
 {
-    public override string ToString() => $"{Name}: OSC {OscIp}:{OscPort}, avatar {AvatarId}, ImagePad params {ImagePadParams}/32, format {(Format?.ToString() ?? "-")}{(Problem != null ? " (" + Problem + ")" : "")}";
+    public override string ToString() => $"{Name}: OSC {OscIp}:{OscPort}, avatar {AvatarId}, ImagePad Int params {(ImagePadParams > 0 ? $"{ImagePadParams} (D0..D{ImagePadParams - 1})" : "0")}, format {(Format?.ToString() ?? "-")}{(Problem != null ? " (" + Problem + ")" : "")}";
 }
 
 // ImagePad_Format (local-only avatar parameter set by the prefab) -> decoder variant
@@ -24,7 +24,7 @@ public static class DecoderFormat
 
 public static class VrcDiscovery
 {
-    public const int ParamCount = 32;
+    public const int MaxParams = 32;
 
     public static async Task<List<VrcClient>> FindAsync(double waitSec)
     {
@@ -56,12 +56,13 @@ public static class VrcDiscovery
                 string? avatar = tree.GetNodeWithPath("/avatar/change")?.Value?.FirstOrDefault()?.ToString();
                 if (Environment.GetEnvironmentVariable("IMAGEPAD_DEBUG") == "1")
                     Console.WriteLine($"  [debug] {p.name} D0 value: {string.Join(",", tree.GetNodeWithPath("/avatar/parameters/D0")?.Value ?? Array.Empty<object>())}");
+                // ImagePad Int parameters: consecutive D0, D1, ... of type i (the prefab defines D0..D(B-1))
                 int ok = 0; string? problem = null;
-                for (int i = 0; i < ParamCount; i++)
+                for (int i = 0; i < MaxParams; i++)
                 {
                     var node = tree.GetNodeWithPath($"/avatar/parameters/D{i}");
-                    if (node == null) { problem ??= $"D{i} missing"; continue; }
-                    if (node.OscType != "i") { problem ??= $"D{i} type {node.OscType} (expected i)"; continue; }
+                    if (node == null) { if (i == 0) problem = "D0 missing"; break; }
+                    if (node.OscType != "i") { problem = $"D{i} type {node.OscType} (expected i)"; break; }
                     ok++;
                 }
                 int? format = null;

@@ -17,6 +17,9 @@ namespace ImagePad;
 public sealed class PrimConfig
 {
     public int Cb = 9, Rb = 8, Ab = 6, ABits = 2, R = 512, MaxPrims = 4000;
+    // primitive capacity of the decoder the layout (unit id bits, primitives per unit) is made for; 0 = MaxPrims.
+    // Encoding fewer primitives than the decoder holds (MaxPrims < LayoutPrims) just sends fewer units.
+    public int LayoutPrims = 0;
     public int[] Col = { 5, 6, 5 };
     public double StopFrac = 2e-5;
     public int NRand = 200, NClimb = 4, MaxAge = 100, MaxIter = 600;
@@ -39,7 +42,8 @@ public sealed class PrimLayout
             int pay = P - u;
             if (primBits > pay) continue; // split primitives (s = 2) are not supported here
             int k = pay / primBits, k0 = Math.Max(0, (pay - 16) / primBits);
-            int maxPrims = k0 + (int)Math.Ceiling(Math.Max(0, cfg.MaxPrims - k0) / (double)k) * k;
+            int cap = cfg.LayoutPrims > 0 ? cfg.LayoutPrims : cfg.MaxPrims;
+            int maxPrims = k0 + (int)Math.Ceiling(Math.Max(0, cap - k0) / (double)k) * k;
             int units = 1 + (maxPrims - k0) / k;
             if (units <= (1 << u)) return new PrimLayout { U = u, Pay = pay, K = k, K0 = k0, Units = units, MaxPrims = maxPrims, PrimBits = primBits, Widths = widths };
         }
@@ -310,7 +314,9 @@ public sealed unsafe class PrimEncoder
         var rowCum = new double[R];
         var prims = new List<Cand>();
         var hist = new List<double>();
-        int target = L.MaxPrims;
+        // requested primitives, rounded up to whole units, within the decoder capacity
+        int target = Math.Min(L.MaxPrims, cfg.MaxPrims <= L.K0 ? cfg.MaxPrims : L.K0 + (int)Math.Ceiling((cfg.MaxPrims - L.K0) / (double)L.K) * L.K);
+        int target0 = target;
         for (int j = 0; j < target; j++)
         {
             var pw = Stopwatch.StartNew();
@@ -342,7 +348,7 @@ public sealed unsafe class PrimEncoder
             prims.Add(best);
             hist.Add(-Math.Min(0, best.S.d));
             // early stop when gains become negligible (keep unit-aligned count)
-            if (j + 1 >= 50 && j + 1 < target && target == L.MaxPrims)
+            if (j + 1 >= 50 && j + 1 < target && target == target0)
             {
                 double gain = 0;
                 for (int t = hist.Count - 20; t < hist.Count; t++) gain += hist[t];

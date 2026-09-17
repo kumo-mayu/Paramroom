@@ -36,7 +36,9 @@ public static class ImagePadPrimTest
             int W = 2 * C, H = C + 8192 / W + 16, ctrlY = C + 8192 / W + 8;
             int pi = json.IndexOf("\"packets\"");
             var nums = Regex.Matches(json.Substring(pi), "[0-9]+").Cast<Match>().Select(m => int.Parse(m.Value)).ToList();
-            int nPackets = nums.Count / 32;
+            var nbMatch = Regex.Match(json, "\"bytes\":([0-9]+)");
+            int NB = nbMatch.Success ? int.Parse(nbMatch.Groups[1].Value) : 32; // synced Int parameters per packet
+            int nPackets = nums.Count / NB;
             int nBatches = (NPrims + 31) / 32;
 
             var shader = Shader.Find("ImagePad/PrimDecoder");
@@ -48,7 +50,7 @@ public static class ImagePadPrimTest
             foreach (var m in new[] { matA, matB })
             {
                 m.SetFloat("_U", U); m.SetFloat("_K", K); m.SetFloat("_K0", K0); m.SetFloat("_NPrims", NPrims);
-                m.SetFloat("_R", R); m.SetFloat("_Canvas", C);
+                m.SetFloat("_R", R); m.SetFloat("_Canvas", C); m.SetFloat("_ByteCount", NB);
             }
             Camera MakeCam(Vector3 pos, RenderTexture target, Material mat, RenderTexture src, float far)
             {
@@ -69,7 +71,7 @@ public static class ImagePadPrimTest
             }
             var camA = MakeCam(new Vector3(200, 0, 0), rtA, matA, rtB, 0.0217f);
             var camB = MakeCam(new Vector3(200, 0, 5), rtB, matB, rtA, 0.0219f);
-            void SetPacket(int k) { for (int b = 0; b < 32; b++) { float v = nums[k * 32 + b]; matA.SetFloat($"_P{b}", v); matB.SetFloat($"_P{b}", v); } }
+            void SetPacket(int k) { for (int b = 0; b < NB; b++) { float v = nums[k * NB + b]; matA.SetFloat($"_P{b}", v); matB.SetFloat($"_P{b}", v); } }
             void Step() { camA.Render(); camB.Render(); }
             Color[] ReadAtlas()
             {
@@ -124,7 +126,7 @@ public static class ImagePadPrimTest
             Debug.Log($"[ImagePad] prim idle: 120 idle steps {sw3.ElapsedMilliseconds} ms ({sw3.ElapsedMilliseconds / 120.0:F2} ms/step) vs drawing {(double)sw2.ElapsedMilliseconds / (nBatches * 2 + 4):F2} ms/step; after repeated packet counter={Ctrl(p2, 0).r} dirty={Ctrl(p2, 6).r} (expect 0/0)");
 
             // phase 2: fresh state (epoch 2), first half of packets, go idle, then the rest: display must match again
-            void SetEpoch2(int k) { SetPacket(k); float b0 = nums[k * 32] & 0x3F | 0x80; matA.SetFloat("_P0", b0); matB.SetFloat("_P0", b0); }
+            void SetEpoch2(int k) { SetPacket(k); float b0 = nums[k * NB] & 0x3F | 0x80; matA.SetFloat("_P0", b0); matB.SetFloat("_P0", b0); }
             for (int k = 0; k < nPackets / 2; k++) { SetEpoch2(k); for (int h = 0; h < Hold; h++) Step(); }
             Settle();
             var p3 = ReadAtlas();

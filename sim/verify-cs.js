@@ -16,14 +16,16 @@ const j = JSON.parse(fs.readFileSync(argv[0], 'utf8'));
 let src = I.loadPNG(argv[1]);
 if (opt('fit') === 'crop') { const s = Math.min(src.w, src.h); src = I.crop(src, (src.w - s) >> 1, (src.h - s) >> 1, s, s); }
 const target = I.resize(src, j.R, j.R);
-const cfg = { ...prim.cfgOf({ shape: 'ell', cb: j.R >= 1024 ? 10 : 9, rb: 8, ab: 6, col: [5, 6, 5], aBits: 2, R: j.R, maxPrims: j.n }), out: j.R };
-const L = prim.layout(cfg, 254);
+// layout of the decoder the units were made for: capacity (primitives) and packet size (Int parameters)
+const P = 8 * (j.bytes || 32) - 2;
+const cfg = { ...prim.cfgOf({ shape: 'ell', cb: j.R >= 1024 ? 10 : 9, rb: 8, ab: 6, col: [5, 6, 5], aBits: 2, R: j.R, maxPrims: j.capacity || j.n }), out: j.R };
+const L = prim.layout(cfg, P);
 if (j.units.length > L.units) throw new Error(`too many units ${j.units.length} > ${L.units}`);
-const dec = prim.decoder(cfg, 254);
+const dec = prim.decoder(cfg, P);
 for (const u of j.units) dec.apply([...u].map(Number));
 const r = dec.render();
 const m = M.all(target, r);
-console.log(`C# units: ${j.units.length} (layout u=${L.u}, ${j.prims} prims, enc ${j.encSec.toFixed(2)} s) -> msssimc ${m.msssimc.toFixed(4)} psnr ${m.psnr.toFixed(2)} dB`);
+console.log(`C# units: ${j.units.length} (${j.bytes || 32} Int, capacity ${j.capacity || j.n}, layout u=${L.u} k=${L.k}, ${j.prims} prims, enc ${j.encSec.toFixed(2)} s) -> msssimc ${m.msssimc.toFixed(4)} psnr ${m.psnr.toFixed(2)} dB`);
 if (opt('canvas')) {
   const c = I.loadPNG(opt('canvas'));
   let md = 0; for (let i = 0; i < c.data.length; i++) md = Math.max(md, Math.abs(c.data[i] - r.data[i]));

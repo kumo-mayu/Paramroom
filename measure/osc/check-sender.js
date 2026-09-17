@@ -12,9 +12,10 @@ const j = JSON.parse(fs.readFileSync(argv[0], 'utf8'));
 const port = Number(opt('port', 9123)), epoch = Number(opt('epoch', 1)), seconds = Number(opt('seconds', 5));
 const expected = new Map(j.units.map((u, id) => {
   const bits = [(epoch >> 1) & 1, epoch & 1, ...[...u].map(Number)];
+  const NB = j.bytes || 32;
   const bytes = [];
-  for (let i = 0; i < 32; i++) { let v = 0; for (let k = 0; k < 8; k++) v = (v << 1) | bits[i * 8 + k]; bytes.push(v); }
-  bytes[31] = j.aspect;
+  for (let i = 0; i < NB; i++) { let v = 0; for (let k = 0; k < 8; k++) v = (v << 1) | bits[i * 8 + k]; bytes.push(v); }
+  bytes[NB - 1] = j.aspect;
   return [bytes.join(','), id];
 }));
 
@@ -26,12 +27,12 @@ sock.on('message', buf => {
   let [tag, o] = str(buf, 0);
   if (tag !== '#bundle') { bad++; return; }
   o += 8;
-  const vals = new Array(32).fill(-1);
+  const vals = new Array(j.bytes || 32).fill(-1);
   while (o < buf.length) {
     const size = buf.readInt32BE(o); o += 4;
     const [addr, o2] = str(buf, o); const [types, o3] = str(buf, o2);
     const m = /^\/avatar\/parameters\/D(\d+)$/.exec(addr);
-    if (m && types === ',i') vals[Number(m[1])] = buf.readInt32BE(o3);
+    if (m && types === ',i' && Number(m[1]) < vals.length) vals[Number(m[1])] = buf.readInt32BE(o3); else bad += 0;
     o += size;
   }
   const id = expected.get(vals.join(','));

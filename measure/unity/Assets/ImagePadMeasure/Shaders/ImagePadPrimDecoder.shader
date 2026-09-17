@@ -1,6 +1,6 @@
 // ImagePad primitive-shape decoder (prototype) - camera-loop state machine.
 //
-// Packet (wire, MSB first, B = 8 * _ByteCount bits, bytes in _P0.._P31 = synced Int parameters):
+// Packet (wire, MSB first, 8 * _ByteCount bits, bytes in _P0.._P(_ByteCount-1) = synced Int parameters, _ByteCount <= 32):
 //   [epoch 2][unit id _U][payload]   (see sim/codecs/prim.js, layout s=1, rotated ellipses)
 //   unit 0 : [bg RGB565 16][_K0 primitives]     unit i>=1 : [_K primitives]
 //   primitive: cx(_CB) cy(_CB) rx(_RB) ry(_RB) theta(_AB) r(_CR) g(_CG) b(_CBL) alpha(_ABITS)
@@ -18,7 +18,7 @@
 // Redraw on change: a redraw cycle (batches s = 0..nBatches-1) starts only when dirty is set; with nothing new the
 // canvas passes just copy the previous texel (steady state costs almost nothing). A packet marks dirty only if it
 // changes the store (a new unit, or different bytes), so repeated units do not trigger redraws.
-// Aspect code = last packet byte (_P31, unit padding; sim/codecs/prim.js aspectCode, 0 = 1:1). It is accepted when two
+// Aspect code = last packet byte (_P(_ByteCount-1), unit padding; sim/codecs/prim.js aspectCode, 0 = 1:1). It is accepted when two
 // consecutive loop passes see the same value; reset -> 0. NOTE: a synced value is held for many passes (2 per frame,
 // ~6 frames per packet), so this is only a one-pass delay, not protection against torn packets. Within an epoch every
 // packet carries the same code, so a torn packet can only show the previous image's shape at an epoch change, for at
@@ -225,6 +225,7 @@ Shader "ImagePad/PrimDecoder"
                 InitLayout();
                 LoadPacket();
                 uint unitBits = (uint)_U, k = (uint)_K, k0 = (uint)_K0, n = (uint)_NPrims;
+                uint lastByte = clamp((uint)_ByteCount, 1u, 32u) - 1;
                 uint primBits = 2 * (uint)_CB + 2 * (uint)_RB + (uint)_AB + (uint)_CR + (uint)_CG + (uint)_CBL + (uint)_ABITS;
                 uint nBatches = (n + (uint)_BatchSize - 1) / (uint)_BatchSize;
 
@@ -263,9 +264,9 @@ Shader "ImagePad/PrimDecoder"
                         if (epoch == 0) return prev;
                         uint seen = (uint)round(Load(5, CTRL_Y).r);
                         if (reset) return float4(0, 0, 0, 1);
-                        return g_pk[31] == seen ? float4(g_pk[31], 0, 0, 1) : prev;
+                        return g_pk[lastByte] == seen ? float4(g_pk[lastByte], 0, 0, 1) : prev;
                     }
-                    if (px == 5) return epoch != 0 ? float4(g_pk[31], 0, 0, 1) : prev;
+                    if (px == 5) return epoch != 0 ? float4(g_pk[lastByte], 0, 0, 1) : prev;
                     if (px == 6)
                     {
                         if (reset) return float4(1, 0, 0, 1);
