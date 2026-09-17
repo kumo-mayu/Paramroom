@@ -11,6 +11,9 @@ const [decodedPath, logPath] = argv;
 const opt = (n, d) => { const i = argv.indexOf('--' + n); return i < 0 ? d : argv[i + 1]; };
 if (!decodedPath || !logPath) { console.log('usage: node analyze.js <decoded.csv> <sender-log.csv> [--out report.md]'); process.exit(1); }
 const outPath = opt('out', decodedPath.replace(/\.csv$/, '') + '.report.md');
+// --ignoreConsistency: count a sequence number as seen even when the board's consistency flag is 0
+// (recordings made with the old prefab, where zero bytes stayed stale); torn/exactness columns are then invalid.
+const ignoreConsistency = argv.includes('--ignoreConsistency');
 
 function readCsv(p) {
   const lines = fs.readFileSync(p, 'utf8').trim().split(/\r?\n/);
@@ -18,7 +21,8 @@ function readCsv(p) {
   return lines.slice(1).map(l => { const v = l.split(','); const o = {}; head.forEach((h, i) => (o[h] = isNaN(+v[i]) ? v[i] : +v[i])); return o; });
 }
 const frames = readCsv(decodedPath).filter(r => r.valid === 1);
-const sent = readCsv(logPath);
+const sent = [].concat(...logPath.split('+').map(readCsv)); // several logs can be joined with '+'
+const sentKeys = new Set(sent.map(s => `${s.epoch}:${s.seq}`));
 const fps = (() => { const f = frames.find(r => r.frame > 0); return f ? f.frame / (f.timeMs / 1000) : 60; })();
 const frameMs = 1000 / fps;
 
@@ -29,8 +33,9 @@ for (const r of frames) boards[r.isLocal ? 'local' : 'remote'].push(r);
 function sightings(rows) {
   const first = new Map(); // key epoch:seq -> timeMs
   for (const r of rows) {
-    if (!r.consistent || r.allZero) continue;
+    if ((!ignoreConsistency && !r.consistent) || r.allZero) continue;
     const k = `${r.epoch}:${r.seq}`;
+    if (ignoreConsistency && !sentKeys.has(k)) continue;
     if (!first.has(k)) first.set(k, r.timeMs);
   }
   return first;
@@ -52,6 +57,7 @@ P(`# 実機測定レポート`);
 P(`- 動画: \`${decodedPath}\`（有効フレーム ${frames.length}、推定 ${fps.toFixed(1)} fps）`);
 P(`- 送信ログ: \`${logPath}\`（${sent.length} パケット）`);
 P(`- ボード: local ${boards.local.length} フレーム / remote ${boards.remote.length} フレーム`);
+if (ignoreConsistency) P('- 注意: 整合フラグを無視して集計（旧プレハブの録画）。半端パケット・厳密値の列は無効');
 P(`- 時刻合わせ: ${refBoard} ボード基準、オフセット ${offset.toFixed(1)} ms`);
 P('');
 

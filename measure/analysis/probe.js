@@ -26,7 +26,9 @@ rx.on('message', m => {
   const v = tag === ',i' ? m.readInt32BE(p) : tag === ',f' ? m.readFloatBE(p) : NaN;
   echo.set(+mm[1], v);
 });
+rx.on('error', e => console.log('echo listener unavailable:', e.code));
 rx.bind(9001);
+setTimeout(() => { console.log('probe timeout'); process.exit(2); }, 45000);
 
 function oscInt(address, value) {
   const s = x => { const b = Buffer.from(x + '\0'); return Buffer.concat([b, Buffer.alloc((4 - (b.length % 4)) % 4)]); };
