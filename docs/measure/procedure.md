@@ -42,8 +42,8 @@
 ### 1.4 2 クライアントの起動
 同じ PC で 2 つ起動する場合（初回はそれぞれのプロファイルで A / B にログイン）:
 ```
-"C:\Program Files (x86)\Steam\steamapps\common\VRChat\VRChat.exe" --profile=0 --no-vr --fps=60 --osc=9000:127.0.0.1:9001 -screen-width 960 -screen-height 540
-"C:\Program Files (x86)\Steam\steamapps\common\VRChat\VRChat.exe" --profile=1 --no-vr --fps=60 --osc=9010:127.0.0.1:9011 -screen-width 960 -screen-height 540
+"C:\Program Files (x86)\Steam\steamapps\common\VRChat\launch.exe" --profile=0 --no-vr --fps=60 --osc=9000:127.0.0.1:9001 -screen-width 960 -screen-height 540
+"C:\Program Files (x86)\Steam\steamapps\common\VRChat\launch.exe" --profile=1 --no-vr --fps=60 --osc=9010:127.0.0.1:9011 -screen-width 960 -screen-height 540
 ```
 - **`VRChat.exe` を直接起動すると「offline testing mode」になりオンラインのワールドに入れない**。必ず `launch.exe`（EAC 経由）から起動する。デスクトップのショートカット「VRChat 測定A/B/C」は設定済み。
 - 起動は少し時間をずらす（EAC の多重起動エラー回避）。
