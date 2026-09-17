@@ -233,7 +233,9 @@ public static class ImagePadMeasureBuilder
         so.ApplyModifiedPropertiesWithoutUndo();
     }
 
-    internal static void AddParameters(GameObject root, int byteCount)
+    // D0..D(n-1) synced Int; formatId > 0 also adds ImagePad_Format, a local-only (not synced, 0 sync bits) Int whose
+    // default value tells the sender (via OSCQuery) which decoder variant the avatar has.
+    internal static void AddParameters(GameObject root, int byteCount, int formatId = 0)
     {
         var t = FindType("nadena.dev.modular_avatar.core.ModularAvatarParameters");
         if (t == null) { Debug.LogWarning("[ImagePad] Modular Avatar not found: add D0..D(n-1) Int synced parameters manually."); return; }
@@ -242,17 +244,18 @@ public static class ImagePadMeasureBuilder
         var list = Req(so, "parameters");
         var syncEnum = FindType("nadena.dev.modular_avatar.core.ParameterSyncType");
         int intSync = syncEnum != null ? (int)Enum.Parse(syncEnum, "Int") : 1;
-        list.arraySize = byteCount;
-        for (int i = 0; i < byteCount; i++)
+        list.arraySize = byteCount + (formatId > 0 ? 1 : 0);
+        for (int i = 0; i < list.arraySize; i++)
         {
+            bool format = i == byteCount;
             var el = list.GetArrayElementAtIndex(i);
-            Req(el, "nameOrPrefix").stringValue = $"D{i}";
+            Req(el, "nameOrPrefix").stringValue = format ? "ImagePad_Format" : $"D{i}";
             Req(el, "remapTo").stringValue = "";
             Req(el, "internalParameter").boolValue = false;
             Req(el, "isPrefix").boolValue = false;
             Req(el, "syncType").intValue = intSync;
-            Req(el, "localOnly").boolValue = false;
-            Req(el, "defaultValue").floatValue = 0;
+            Req(el, "localOnly").boolValue = format;
+            Req(el, "defaultValue").floatValue = format ? formatId : 0;
             Req(el, "saved").boolValue = false;
         }
         so.ApplyModifiedPropertiesWithoutUndo();

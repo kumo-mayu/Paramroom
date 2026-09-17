@@ -20,17 +20,19 @@ public static class ImagePadPrimBuilder
     const int LoopLayer = 12;
 
     [MenuItem("Tools/ImagePad/Build Prim Decoder Prefab (256 bit)")]
-    public static void Build() => Build(256, 1003, 8, 0.0237f, 0.0239f, "");
+    public static void Build() => Build(256, 1003, 8, 0.0237f, 0.0239f, "", 1);
 
     [MenuItem("Tools/ImagePad/Build Prim Decoder Prefab (256 bit, 512 canvas, 2000)")]
-    public static void Build512n2000() => Build(512, 2003, 9, 0.0257f, 0.0259f, "512n2000");
+    public static void Build512n2000() => Build(512, 2003, 9, 0.0257f, 0.0259f, "512n2000", 2);
 
     [MenuItem("Tools/ImagePad/Build Prim Decoder Prefab (256 bit, 512 canvas, 4000)")]
-    public static void Build512() => Build(512, 4003, 10, 0.0247f, 0.0249f, "512");
+    public static void Build512() => Build(512, 4003, 10, 0.0247f, 0.0249f, "512", 3);
 
     // canvas: texels = coordinate range; nPrims / unitBits must match sim/codecs/prim.js layout for the sender config;
     // farA / farB: unique loop camera far planes (the quads only draw for their own camera)
-    static void Build(int canvas, int nPrims, int unitBits, float FarA, float FarB, string suffix)
+    // formatId: value of the local-only ImagePad_Format parameter read by the sender (tools/ImagePadTool: 1 = 256/1000,
+    // 2 = 512/2000, 3 = 512/4000)
+    static void Build(int canvas, int nPrims, int unitBits, float FarA, float FarB, string suffix, int formatId)
     {
         string Gen = Root + "/GeneratedPrim" + suffix;
         if (!AssetDatabase.IsValidFolder(Gen)) AssetDatabase.CreateFolder(Root, "GeneratedPrim" + suffix);
@@ -132,7 +134,7 @@ public static class ImagePadPrimBuilder
         EditorUtility.SetDirty(ctrl);
 
         ImagePadMeasureBuilder.AddMergeAnimator(root, ctrl);
-        ImagePadMeasureBuilder.AddParameters(root, 32);
+        ImagePadMeasureBuilder.AddParameters(root, 32, formatId);
         PrefabUtility.SaveAsPrefabAsset(root, $"{Root}/ImagePadPrimDecoder{suffix}.prefab");
         UnityEngine.Object.DestroyImmediate(root);
         AssetDatabase.SaveAssets();
