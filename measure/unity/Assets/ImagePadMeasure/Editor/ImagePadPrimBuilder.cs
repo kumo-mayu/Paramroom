@@ -1,7 +1,8 @@
 // ImagePad primitive decoder prefab builder (prototype, 256 bit = 32 Int).
 // Menus: Tools/ImagePad/Build Prim Decoder Prefab (256 bit)                -> canvas 256, 1003 primitives (u = 8)
+//        Tools/ImagePad/Build Prim Decoder Prefab (256 bit, 512 canvas, 2000) -> canvas 512, 2003 primitives (u = 9)
 //        Tools/ImagePad/Build Prim Decoder Prefab (256 bit, 512 canvas, 4000) -> canvas 512, 4003 primitives (u = 10)
-// Generates Assets/ImagePadMeasure/ImagePadPrimDecoder.prefab (or ImagePadPrimDecoder512.prefab):
+// Generates Assets/ImagePadMeasure/ImagePadPrimDecoder.prefab (or ImagePadPrimDecoder512n2000 / ImagePadPrimDecoder512.prefab):
 //   - two ARGBHalf atlas RenderTextures, 512x288 / 1024x536 (double-buffered camera loop, see ImagePadPrimDecoder.shader)
 //   - loop cameras A/B (disabled, enabled by the FX animation) with full-viewport decoder quads
 //   - a display quad (ImagePad/PrimDisplay) showing the decoded image
@@ -20,6 +21,9 @@ public static class ImagePadPrimBuilder
 
     [MenuItem("Tools/ImagePad/Build Prim Decoder Prefab (256 bit)")]
     public static void Build() => Build(256, 1003, 8, 0.0237f, 0.0239f, "");
+
+    [MenuItem("Tools/ImagePad/Build Prim Decoder Prefab (256 bit, 512 canvas, 2000)")]
+    public static void Build512n2000() => Build(512, 2003, 9, 0.0257f, 0.0259f, "512n2000");
 
     [MenuItem("Tools/ImagePad/Build Prim Decoder Prefab (256 bit, 512 canvas, 4000)")]
     public static void Build512() => Build(512, 4003, 10, 0.0247f, 0.0249f, "512");
@@ -138,6 +142,6 @@ public static class ImagePadPrimBuilder
 
     public static void BuildBatch()
     {
-        try { Build(); Build512(); EditorApplication.Exit(0); } catch (Exception e) { Debug.LogException(e); EditorApplication.Exit(1); }
+        try { Build(); Build512n2000(); Build512(); EditorApplication.Exit(0); } catch (Exception e) { Debug.LogException(e); EditorApplication.Exit(1); }
     }
 }
