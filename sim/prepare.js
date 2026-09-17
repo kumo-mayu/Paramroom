@@ -4,9 +4,9 @@ const fs = require('fs');
 const path = require('path');
 const I = require('./lib/image');
 
-const SIZE = 256;
-const out = path.join(__dirname, 'images', 'ref');
-const outTrain = path.join(__dirname, 'images', 'ref-train');
+const SIZE = Number(process.argv[2] || 256); // node prepare.js [256|512] -> images/ref (256) or images/ref512
+const out = path.join(__dirname, 'images', SIZE === 256 ? 'ref' : 'ref' + SIZE);
+const outTrain = path.join(__dirname, 'images', SIZE === 256 ? 'ref-train' : 'ref' + SIZE + '-train');
 fs.mkdirSync(out, { recursive: true });
 fs.mkdirSync(outTrain, { recursive: true });
 

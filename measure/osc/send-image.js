@@ -2,8 +2,11 @@
 // Send an image to the ImagePad prim decoder (256 bit = D0..D31) over OSC.
 // usage: node send-image.js <image.png|jpg> [--epoch 1] [--hold 100] [--schedule sqrt|carousel] [--no-bundle]
 //                           [--host 127.0.0.1] [--port 9000] [--duration 0 (=forever)] [--fit stretch|crop]
-// Encoding: sim/codecs/prim.js config e9.8.6-c565a2-r256-n1000. --fit stretch (default): the whole image is stretched
-// to 256x256 and its aspect ratio is sent so the display un-stretches it; --fit crop: centre square crop (1:1).
+//                           [--R 256|512] [--n 1000|4000]  (must match the avatar prefab: ImagePadPrimDecoder = 256/1000,
+//                                                           ImagePadPrimDecoder512 = 512/4000)
+// Encoding: sim/codecs/prim.js rotated ellipses e9.8.6-c565a2 (canvas R, n primitives; R=512 n=4000 takes ~1 min).
+// --fit stretch (default): the whole image is stretched to R x R and its aspect ratio is sent so the display
+// un-stretches it; --fit crop: centre square crop (1:1).
 // Packet: [epoch 2 bits (1..3, never 0)][prim unit 254 bits] -> 32 bytes -> Int parameters D0..D31.
 //         The last byte (D31, unused unit padding) carries prim.aspectCode (0 = unknown = 1:1).
 // Schedule: square-root rule over the units' distortion gains (docs/design/02 §5.1), hold 100 ms, OSC bundle.
@@ -26,16 +29,17 @@ const bundle = !argv.includes('--no-bundle');
 const host = opt('host', '127.0.0.1'), port = Number(opt('port', 9000));
 const duration = Number(opt('duration', 0));
 const fit = opt('fit', 'stretch');
+const R = Number(opt('R', 256)), nPrims = Number(opt('n', R === 512 ? 4000 : 1000));
 
-// load + (stretch | centre square crop) to 256x256
+// load + (stretch | centre square crop) to R x R
 let img = I.loadPNG(path.resolve(file));
 const aspect = fit === 'crop' ? prim.aspectCode(1, 1) : prim.aspectCode(img.w, img.h);
 if (fit === 'crop') { const s = Math.min(img.w, img.h); img = I.crop(img, (img.w - s) >> 1, (img.h - s) >> 1, s, s); }
-img = I.resize(img, 256, 256);
-const cfg = prim.configs(256).find(c => c.label === 'e9.8.6-c565a2-r256-n1000');
+img = I.resize(img, R, R);
+const cfg = prim.cfgOf({ shape: 'ell', cb: 9, rb: 8, ab: 6, col: [5, 6, 5], aBits: 2, R, maxPrims: nPrims });
 const P = 254;
 if (prim.spareBits(prim.layout(cfg, P)) < 8) throw new Error('no spare byte for the aspect code');
-console.log('encoding (primitives)...');
+console.log(`encoding (primitives, canvas ${R}, ${nPrims} primitives)...`);
 const t0 = performance.now();
 const enc = prim.encode(img, cfg, P);
 console.log(`encoded ${enc.units.length} units in ${((performance.now() - t0) / 1000).toFixed(1)} s`);

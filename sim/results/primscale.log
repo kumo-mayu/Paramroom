@@ -1,0 +1,193 @@
+kodim20 R512 n4000: 1001 units, 58 s
+kodim15 R512 n4000: 1001 units, 62 s
+illust_wikipetan_face R512 n4000: 1001 units, 63 s
+kodim03 R512 n4000: 1001 units, 63 s
+kodim08 R512 n4000: 1001 units, 62 s
+illust_tux R512 n4000: 1001 units, 63 s
+kodim07 R512 n4000: 1001 units, 63 s
+kodim01 R512 n4000: 1001 units, 64 s
+kodim04 R512 n4000: 1001 units, 65 s
+illust_chibi R512 n4000: 1001 units, 66 s
+illust_pc_newyear R512 n4000: 1001 units, 67 s
+kodim19 R512 n4000: 1001 units, 66 s
+kodim05 R512 n4000: 1001 units, 71 s
+kodim23 R512 n4000: 1001 units, 73 s
+kodim20 R512 n4000: eval done
+kodim15 R512 n4000: eval done
+illust_wikipetan_face R512 n4000: eval done
+kodim08 R512 n4000: eval done
+kodim03 R512 n4000: eval done
+kodim07 R512 n4000: eval done
+kodim01 R512 n4000: eval done
+illust_tux R512 n4000: eval done
+kodim04 R512 n4000: eval done
+illust_chibi R512 n4000: eval done
+kodim19 R512 n4000: eval done
+illust_pc_newyear R512 n4000: eval done
+kodim05 R512 n4000: eval done
+kodim23 R512 n4000: eval done
+illust_tux R512 n2000: 501 units, 29 s
+kodim01 R512 n2000: 501 units, 29 s
+illust_pc_newyear R512 n2000: 501 units, 30 s
+kodim04 R512 n2000: 501 units, 29 s
+kodim05 R512 n2000: 501 units, 29 s
+illust_chibi R512 n2000: 501 units, 32 s
+illust_wikipetan_face R512 n2000: 501 units, 32 s
+kodim03 R512 n2000: 501 units, 32 s
+kodim07 R512 n2000: 501 units, 30 s
+kodim08 R512 n2000: 501 units, 30 s
+kodim15 R512 n2000: 501 units, 33 s
+kodim19 R512 n2000: 501 units, 33 s
+screenshot_mahara R512 n4000: 1001 units, 50 s
+screenshot_wikipedia R512 n4000: 1001 units, 50 s
+illust_tux R512 n2000: eval done
+kodim01 R512 n2000: eval done
+illust_pc_newyear R512 n2000: eval done
+kodim04 R512 n2000: eval done
+kodim05 R512 n2000: eval done
+illust_chibi R512 n2000: eval done
+illust_wikipetan_face R512 n2000: eval done
+kodim03 R512 n2000: eval done
+kodim08 R512 n2000: eval done
+kodim07 R512 n2000: eval done
+kodim15 R512 n2000: eval done
+kodim19 R512 n2000: eval done
+screenshot_mahara R512 n4000: eval done
+illust_tux R512 n1000: 251 units, 16 s
+screenshot_wikipedia R512 n4000: eval done
+illust_wikipetan_face R512 n1000: 251 units, 17 s
+kodim01 R512 n1000: 251 units, 17 s
+illust_pc_newyear R512 n1000: 251 units, 19 s
+illust_chibi R512 n1000: 251 units, 19 s
+kodim03 R512 n1000: 251 units, 19 s
+kodim04 R512 n1000: 251 units, 19 s
+kodim20 R512 n2000: 501 units, 29 s
+screenshot_mahara R512 n2000: 501 units, 29 s
+screenshot_wikipedia R512 n2000: 501 units, 29 s
+kodim05 R512 n1000: 251 units, 19 s
+kodim23 R512 n2000: 501 units, 31 s
+kodim07 R512 n1000: 251 units, 20 s
+kodim08 R512 n1000: 251 units, 17 s
+illust_tux R512 n1000: eval done
+kodim01 R512 n1000: eval done
+illust_pc_newyear R512 n1000: eval done
+illust_chibi R512 n1000: eval done
+illust_wikipetan_face R512 n1000: eval done
+kodim03 R512 n1000: eval done
+kodim20 R512 n2000: eval done
+kodim04 R512 n1000: eval done
+screenshot_wikipedia R512 n2000: eval done
+screenshot_mahara R512 n2000: eval done
+kodim05 R512 n1000: eval done
+kodim23 R512 n2000: eval done
+kodim07 R512 n1000: eval done
+kodim08 R512 n1000: eval done
+kodim15 R512 n1000: 251 units, 17 s
+kodim20 R512 n1000: 251 units, 17 s
+screenshot_mahara R512 n1000: 251 units, 17 s
+kodim19 R512 n1000: 251 units, 17 s
+kodim23 R512 n1000: 251 units, 19 s
+screenshot_wikipedia R512 n1000: 251 units, 17 s
+illust_tux R256 n4000: 1001 units, 15 s
+illust_chibi R256 n4000: 1001 units, 17 s
+illust_pc_newyear R256 n4000: 1001 units, 17 s
+illust_wikipetan_face R256 n4000: 1001 units, 16 s
+kodim01 R256 n4000: 1001 units, 18 s
+kodim03 R256 n4000: 1001 units, 17 s
+kodim04 R256 n4000: 1001 units, 16 s
+kodim05 R256 n4000: 1001 units, 16 s
+kodim15 R512 n1000: eval done
+kodim19 R512 n1000: eval done
+kodim20 R512 n1000: eval done
+screenshot_mahara R512 n1000: eval done
+kodim23 R512 n1000: eval done
+screenshot_wikipedia R512 n1000: eval done
+illust_tux R256 n4000: eval done
+illust_chibi R256 n4000: eval done
+illust_wikipetan_face R256 n4000: eval done
+illust_pc_newyear R256 n4000: eval done
+kodim01 R256 n4000: eval done
+kodim03 R256 n4000: eval done
+kodim05 R256 n4000: eval done
+kodim04 R256 n4000: eval done
+kodim07 R256 n4000: 1001 units, 17 s
+kodim08 R256 n4000: 1001 units, 15 s
+kodim15 R256 n4000: 1001 units, 16 s
+kodim20 R256 n4000: 1001 units, 15 s
+illust_pc_newyear R256 n2000: 501 units, 9 s
+kodim19 R256 n4000: 1001 units, 17 s
+illust_chibi R256 n2000: 501 units, 10 s
+illust_tux R256 n2000: 501 units, 9 s
+illust_wikipetan_face R256 n2000: 501 units, 9 s
+kodim23 R256 n4000: 1001 units, 17 s
+screenshot_wikipedia R256 n4000: 1001 units, 15 s
+kodim01 R256 n2000: 501 units, 10 s
+kodim03 R256 n2000: 501 units, 10 s
+screenshot_mahara R256 n4000: 1001 units, 18 s
+kodim07 R256 n4000: eval done
+kodim08 R256 n4000: eval done
+kodim15 R256 n4000: eval done
+kodim20 R256 n4000: eval done
+illust_pc_newyear R256 n2000: eval done
+kodim19 R256 n4000: eval done
+illust_chibi R256 n2000: eval done
+illust_tux R256 n2000: eval done
+illust_wikipetan_face R256 n2000: eval done
+kodim23 R256 n4000: eval done
+kodim01 R256 n2000: eval done
+screenshot_wikipedia R256 n4000: eval done
+kodim03 R256 n2000: eval done
+kodim04 R256 n2000: 501 units, 10 s
+kodim05 R256 n2000: 501 units, 9 s
+screenshot_mahara R256 n4000: eval done
+kodim08 R256 n2000: 501 units, 9 s
+kodim07 R256 n2000: 501 units, 10 s
+kodim20 R256 n2000: 501 units, 9 s
+kodim15 R256 n2000: 501 units, 10 s
+kodim19 R256 n2000: 501 units, 11 s
+illust_tux R256 n1000: 251 units, 5 s
+screenshot_wikipedia R256 n2000: 501 units, 8 s
+illust_chibi R256 n1000: 251 units, 6 s
+illust_pc_newyear R256 n1000: 251 units, 6 s
+kodim23 R256 n2000: 501 units, 10 s
+screenshot_mahara R256 n2000: 501 units, 11 s
+illust_wikipetan_face R256 n1000: 251 units, 6 s
+kodim04 R256 n2000: eval done
+kodim05 R256 n2000: eval done
+kodim08 R256 n2000: eval done
+kodim07 R256 n2000: eval done
+kodim15 R256 n2000: eval done
+kodim20 R256 n2000: eval done
+illust_tux R256 n1000: eval done
+kodim19 R256 n2000: eval done
+illust_chibi R256 n1000: eval done
+screenshot_wikipedia R256 n2000: eval done
+kodim23 R256 n2000: eval done
+illust_pc_newyear R256 n1000: eval done
+screenshot_mahara R256 n2000: eval done
+illust_wikipetan_face R256 n1000: eval done
+kodim03 R256 n1000: 251 units, 6 s
+kodim01 R256 n1000: 251 units, 6 s
+kodim04 R256 n1000: 251 units, 6 s
+kodim05 R256 n1000: 251 units, 6 s
+kodim08 R256 n1000: 251 units, 5 s
+kodim07 R256 n1000: 251 units, 6 s
+kodim15 R256 n1000: 251 units, 6 s
+kodim20 R256 n1000: 251 units, 6 s
+kodim19 R256 n1000: 251 units, 6 s
+screenshot_wikipedia R256 n1000: 251 units, 5 s
+kodim23 R256 n1000: 251 units, 6 s
+screenshot_mahara R256 n1000: 251 units, 8 s
+kodim03 R256 n1000: eval done
+kodim01 R256 n1000: eval done
+kodim04 R256 n1000: eval done
+kodim05 R256 n1000: eval done
+kodim08 R256 n1000: eval done
+kodim07 R256 n1000: eval done
+kodim15 R256 n1000: eval done
+kodim20 R256 n1000: eval done
+kodim19 R256 n1000: eval done
+screenshot_wikipedia R256 n1000: eval done
+kodim23 R256 n1000: eval done
+screenshot_mahara R256 n1000: eval done
+done

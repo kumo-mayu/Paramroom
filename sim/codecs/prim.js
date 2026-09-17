@@ -450,7 +450,7 @@ module.exports = {
           const n = G.raster(g, idx);
           blend(cur, idx, n, rgb, a);
         }
-        return I.quantize8(I.resize({ w: R, h: R, c: 3, data: cur }, 256, 256));
+        return I.quantize8(I.resize({ w: R, h: R, c: 3, data: cur }, cfg.out || 256, cfg.out || 256)); // cfg.out: display size (default 256)
       },
     };
   },

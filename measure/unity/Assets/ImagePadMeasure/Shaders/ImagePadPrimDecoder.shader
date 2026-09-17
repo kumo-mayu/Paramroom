@@ -6,13 +6,18 @@
 //   primitive: cx(_CB) cy(_CB) rx(_RB) ry(_RB) theta(_AB) r(_CR) g(_CG) b(_CBL) alpha(_ABITS)
 // Epoch 0 is ignored (transient all-zero parameters). A new non-zero epoch clears the state.
 //
-// State atlas (RGBAHalf, 512 x 288, double buffered: this pass reads _Src = the other buffer):
-//   work canvas     x [0,256)   y [0,256)   canvas being redrawn, _BatchSize primitives per pass
-//   display canvas  x [256,512) y [0,256)   last completed canvas (what the board shows)
-//   primitive store y [256,272) texel index t = 2*j + h (h = 0/1): bytes of primitive j's bit field
-//                   (4 bytes per texel, value 0..255 exact in half); present flag = byte 7 bit 0
-//   control         y = 280: x0 = pass counter (mod batch count), x1 = epoch, x2 = bg present, x3 = bg RGB 0..255,
-//                   x4 = accepted aspect code, x5 = aspect code of the previous valid packet
+// State atlas (RGBAHalf, double buffered: this pass reads _Src = the other buffer). C = _Canvas (256 or 512):
+//   size 2C x (C + 8192/(2C) + 16): C=256 -> 512 x 288, C=512 -> 1024 x 536
+//   work canvas     x [0,C)   y [0,C)   canvas being redrawn, _BatchSize primitives per pass
+//   display canvas  x [C,2C)  y [0,C)   last completed canvas (what the board shows)
+//   primitive store y [C, C+8192/(2C)) texel index t = 2*j + h (h = 0/1): bytes of primitive j's bit field
+//                   (4 bytes per texel, value 0..255 exact in half); present flag = byte 7 bit 0; <= 4096 primitives
+//   control         y = CTRL = C + 8192/(2C) + 8: x0 = batch counter s, x1 = epoch, x2 = bg present,
+//                   x3 = bg RGB 0..255, x4 = accepted aspect code, x5 = aspect code of the previous valid packet,
+//                   x6 = dirty (the store changed since the running/last redraw started)
+// Redraw on change: a redraw cycle (batches s = 0..nBatches-1) starts only when dirty is set; with nothing new the
+// canvas passes just copy the previous texel (steady state costs almost nothing). A packet marks dirty only if it
+// changes the store (a new unit, or different bytes), so repeated units do not trigger redraws.
 // Aspect code = last packet byte (_P31, unit padding; sim/codecs/prim.js aspectCode, 0 = 1:1). It is accepted when two
 // consecutive loop passes see the same value; reset -> 0. NOTE: a synced value is held for many passes (2 per frame,
 // ~6 frames per packet), so this is only a one-pass delay, not protection against torn packets. Within an epoch every
@@ -37,7 +42,8 @@ Shader "ImagePad/PrimDecoder"
         _CG ("Green bits", Float) = 6
         _CBL ("Blue bits", Float) = 5
         _ABITS ("Alpha bits", Float) = 2
-        _R ("Canvas resolution", Float) = 256
+        _R ("Primitive coordinate range", Float) = 256
+        _Canvas ("Canvas texels (256 or 512)", Float) = 256
         _BatchSize ("Primitives per pass", Float) = 32
         _P0 ("P0", Float) = 0
         _P1 ("P1", Float) = 0
@@ -85,13 +91,13 @@ Shader "ImagePad/PrimDecoder"
             #include "UnityCG.cginc"
 
             Texture2D<float4> _Src;
-            float _Far, _ByteCount, _U, _K, _K0, _NPrims, _CB, _RB, _AB, _CR, _CG, _CBL, _ABITS, _R, _BatchSize;
+            float _Far, _ByteCount, _U, _K, _K0, _NPrims, _CB, _RB, _AB, _CR, _CG, _CBL, _ABITS, _R, _Canvas, _BatchSize;
             float _P0, _P1, _P2, _P3, _P4, _P5, _P6, _P7, _P8, _P9, _P10, _P11, _P12, _P13, _P14, _P15;
             float _P16, _P17, _P18, _P19, _P20, _P21, _P22, _P23, _P24, _P25, _P26, _P27, _P28, _P29, _P30, _P31;
 
-            static const uint ATLAS_W = 512;
-            static const uint STORE_Y = 256;
-            static const uint CTRL_Y = 280;
+            // atlas layout (set at the start of frag from _Canvas)
+            static uint C, ATLAS_W, STORE_Y, STORE_ROWS, CTRL_Y;
+            void InitLayout() { C = (uint)_Canvas; ATLAS_W = 2 * C; STORE_Y = C; STORE_ROWS = 8192 / ATLAS_W; CTRL_Y = C + STORE_ROWS + 8; }
 
             struct appdata { float4 vertex : POSITION; float2 uv : TEXCOORD0; };
             struct v2f { float4 pos : SV_POSITION; };
@@ -164,9 +170,59 @@ Shader "ImagePad/PrimDecoder"
                 return c * (1 - a) + float3(r, g, b) * a;
             }
 
+            // store texel h (0/1) of a primitive whose bit field starts at packet bit off
+            float4 SlotTexel(uint off, uint h, uint primBits)
+            {
+                float4 o;
+                for (uint c = 0; c < 4; c++)
+                {
+                    uint byteIdx = h * 4 + c;       // byte 0..7 of the 64-bit slot
+                    uint startBit = byteIdx * 8;    // bit index within the primitive field
+                    uint v = 0;
+                    if (startBit < primBits)
+                    {
+                        uint nb = min(8u, primBits - startBit);
+                        v = PacketBits(off + startBit, nb) << (8 - nb);
+                    }
+                    if (byteIdx == 7) v |= 1; // present flag (bit 63; primBits <= 63)
+                    o[c] = v;
+                }
+                return o;
+            }
+            bool SlotDiffers(uint j, uint off, uint primBits)
+            {
+                uint t = 2 * j;
+                for (uint h = 0; h < 2; h++)
+                {
+                    float4 a = SlotTexel(off, h, primBits), b = round(Load((t + h) % ATLAS_W, STORE_Y + (t + h) / ATLAS_W));
+                    if (any(a != b)) return true;
+                }
+                return false;
+            }
+            float3 Bg565(uint bg) { return float3(((bg >> 11) & 31) / 31.0 * 255, ((bg >> 5) & 63) / 63.0 * 255, (bg & 31) / 31.0 * 255); }
+            // does the current (valid) packet change the store / background?
+            bool PacketChanges(uint unitId, uint unitBits, uint k, uint k0, uint n, uint primBits)
+            {
+                if (unitId == 0)
+                {
+                    if (Load(2, CTRL_Y).r < 0.5 || any(abs(Bg565(PacketBits(2 + unitBits, 16)) - Load(3, CTRL_Y).rgb) > 0.01)) return true;
+                    for (uint j = 0; j < min(k0, n); j++) if (SlotDiffers(j, 2 + unitBits + 16 + j * primBits, primBits)) return true;
+                    return false;
+                }
+                if (k == 0) return false;
+                for (uint slot = 0; slot < k; slot++)
+                {
+                    uint j = k0 + (unitId - 1) * k + slot;
+                    if (j >= n) break;
+                    if (SlotDiffers(j, 2 + unitBits + slot * primBits, primBits)) return true;
+                }
+                return false;
+            }
+
             float4 frag (v2f i) : SV_Target
             {
                 uint px = (uint)i.pos.x, py = (uint)i.pos.y;
+                InitLayout();
                 LoadPacket();
                 uint unitBits = (uint)_U, k = (uint)_K, k0 = (uint)_K0, n = (uint)_NPrims;
                 uint primBits = 2 * (uint)_CB + 2 * (uint)_RB + (uint)_AB + (uint)_CR + (uint)_CG + (uint)_CBL + (uint)_ABITS;
@@ -177,12 +233,15 @@ Shader "ImagePad/PrimDecoder"
                 uint storedEpoch = (uint)round(Load(1, CTRL_Y).r);
                 bool reset = epoch != 0 && epoch != storedEpoch;
                 uint unitId = PacketBits(2, unitBits);
+                uint sPrev = (uint)round(Load(0, CTRL_Y).r) % nBatches;
+                bool dirtyPrev = Load(6, CTRL_Y).r > 0.5;
+                bool drawing = !reset && (sPrev != 0 || dirtyPrev); // this pass draws batch sPrev
 
                 // ---- control row
                 if (py == CTRL_Y)
                 {
                     float4 prev = Load(px, py);
-                    if (px == 0) return float4(fmod(round(prev.r) + 1, nBatches), 0, 0, 1);
+                    if (px == 0) return float4(drawing ? (sPrev + 1) % nBatches : 0, 0, 0, 1);
                     if (px == 1) return float4(epoch != 0 ? epoch : storedEpoch, 0, 0, 1);
                     if (px == 2)
                     {
@@ -195,8 +254,7 @@ Shader "ImagePad/PrimDecoder"
                         if (reset) return float4(0.5, 0.5, 0.5, 1);
                         if (epoch != 0 && unitId == 0)
                         {
-                            uint bg = PacketBits(2 + unitBits, 16);
-                            return float4(((bg >> 11) & 31) / 31.0 * 255, ((bg >> 5) & 63) / 63.0 * 255, (bg & 31) / 31.0 * 255, 1);
+                            return float4(Bg565(PacketBits(2 + unitBits, 16)), 1);
                         }
                         return prev;
                     }
@@ -208,11 +266,19 @@ Shader "ImagePad/PrimDecoder"
                         return g_pk[31] == seen ? float4(g_pk[31], 0, 0, 1) : prev;
                     }
                     if (px == 5) return epoch != 0 ? float4(g_pk[31], 0, 0, 1) : prev;
+                    if (px == 6)
+                    {
+                        if (reset) return float4(1, 0, 0, 1);
+                        bool changed = epoch != 0 && PacketChanges(unitId, unitBits, k, k0, n, primBits);
+                        // starting a cycle consumes the flag; a change in this very pass is not yet visible to it
+                        bool keep = (sPrev == 0 && dirtyPrev) ? false : dirtyPrev;
+                        return float4((keep || changed) ? 1 : 0, 0, 0, 1);
+                    }
                     return float4(0, 0, 0, 1);
                 }
 
                 // ---- primitive store
-                if (py >= STORE_Y && py < STORE_Y + 16)
+                if (py >= STORE_Y && py < STORE_Y + STORE_ROWS)
                 {
                     uint t = (py - STORE_Y) * ATLAS_W + px;
                     uint j = t / 2, h = t % 2;
@@ -228,35 +294,21 @@ Shader "ImagePad/PrimDecoder"
                         if (unitId == uid) { here = true; off = 2 + unitBits + slot * primBits; }
                     }
                     if (!here) return prev;
-                    float4 o;
-                    for (uint c = 0; c < 4; c++)
-                    {
-                        uint byteIdx = h * 4 + c;       // byte 0..7 of the 64-bit slot
-                        uint startBit = byteIdx * 8;    // bit index within the primitive field
-                        uint v = 0;
-                        if (startBit < primBits)
-                        {
-                            uint nb = min(8u, primBits - startBit);
-                            v = PacketBits(off + startBit, nb) << (8 - nb);
-                        }
-                        if (byteIdx == 7) v |= 1; // present flag (bit 63; primBits <= 63)
-                        o[c] = v;
-                    }
-                    return o;
+                    return SlotTexel(off, h, primBits);
                 }
 
                 // ---- canvases
-                if (py < 256)
+                if (py < C)
                 {
-                    uint counterPrev = (uint)round(Load(0, CTRL_Y).r);
-                    uint s = counterPrev % nBatches;
-                    if (px >= 256)
+                    uint s = sPrev;
+                    if (px >= C)
                     {
-                        // display: when the previous pass finished a full redraw (s wrapped to 0), take the work canvas
+                        // display: at s == 0 the work canvas is complete (a redraw just finished, or idle)
                         if (reset) return float4(0.5, 0.5, 0.5, 1);
-                        return s == 0 ? Load(px - 256, py) : Load(px, py);
+                        return s == 0 ? Load(px - C, py) : Load(px, py);
                     }
-                    float x = px * _R / 256.0, y = py * _R / 256.0;
+                    if (!reset && !drawing) return Load(px, py); // idle: nothing changed
+                    float x = px * _R / C, y = py * _R / C;
                     float3 c;
                     if (s == 0 || reset)
                     {

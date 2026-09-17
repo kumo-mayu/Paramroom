@@ -1,7 +1,8 @@
 // ImagePad primitive decoder prefab builder (prototype, 256 bit = 32 Int).
-// Menu: Tools/ImagePad/Build Prim Decoder Prefab (256 bit)
-// Generates Assets/ImagePadMeasure/ImagePadPrimDecoder.prefab:
-//   - two 512x288 ARGBHalf atlas RenderTextures (double-buffered camera loop, see ImagePadPrimDecoder.shader)
+// Menus: Tools/ImagePad/Build Prim Decoder Prefab (256 bit)                -> canvas 256, 1003 primitives (u = 8)
+//        Tools/ImagePad/Build Prim Decoder Prefab (256 bit, 512 canvas, 4000) -> canvas 512, 4003 primitives (u = 10)
+// Generates Assets/ImagePadMeasure/ImagePadPrimDecoder.prefab (or ImagePadPrimDecoder512.prefab):
+//   - two ARGBHalf atlas RenderTextures, 512x288 / 1024x536 (double-buffered camera loop, see ImagePadPrimDecoder.shader)
 //   - loop cameras A/B (disabled, enabled by the FX animation) with full-viewport decoder quads
 //   - a display quad (ImagePad/PrimDisplay) showing the decoded image
 //   - FX controller: D0..D31 (Float in the animator) -> Direct blend tree -> material._Pi on both decoder quads,
@@ -15,14 +16,20 @@ using UnityEngine;
 public static class ImagePadPrimBuilder
 {
     const string Root = "Assets/ImagePadMeasure";
-    const string Gen = Root + "/GeneratedPrim";
     const int LoopLayer = 12;
-    const float FarA = 0.0237f, FarB = 0.0239f; // distinct from the measurement loop
 
     [MenuItem("Tools/ImagePad/Build Prim Decoder Prefab (256 bit)")]
-    public static void Build()
+    public static void Build() => Build(256, 1003, 8, 0.0237f, 0.0239f, "");
+
+    [MenuItem("Tools/ImagePad/Build Prim Decoder Prefab (256 bit, 512 canvas, 4000)")]
+    public static void Build512() => Build(512, 4003, 10, 0.0247f, 0.0249f, "512");
+
+    // canvas: texels = coordinate range; nPrims / unitBits must match sim/codecs/prim.js layout for the sender config;
+    // farA / farB: unique loop camera far planes (the quads only draw for their own camera)
+    static void Build(int canvas, int nPrims, int unitBits, float FarA, float FarB, string suffix)
     {
-        if (!AssetDatabase.IsValidFolder(Gen)) AssetDatabase.CreateFolder(Root, "GeneratedPrim");
+        string Gen = Root + "/GeneratedPrim" + suffix;
+        if (!AssetDatabase.IsValidFolder(Gen)) AssetDatabase.CreateFolder(Root, "GeneratedPrim" + suffix);
         T Save<T>(T obj, string name) where T : UnityEngine.Object
         {
             var path = $"{Gen}/{name}";
@@ -36,19 +43,24 @@ public static class ImagePadPrimBuilder
 
         RenderTexture Atlas(string name)
         {
-            var d = new RenderTextureDescriptor(512, 288, RenderTextureFormat.ARGBHalf, 0) { sRGB = false, msaaSamples = 1, useMipMap = false, autoGenerateMips = false };
+            var d = new RenderTextureDescriptor(2 * canvas, canvas + 8192 / (2 * canvas) + 16, RenderTextureFormat.ARGBHalf, 0) { sRGB = false, msaaSamples = 1, useMipMap = false, autoGenerateMips = false };
             return Save(new RenderTexture(d) { name = name, filterMode = FilterMode.Point, wrapMode = TextureWrapMode.Clamp }, name + ".renderTexture");
         }
-        var rtA = Atlas("ImagePadPrimAtlasA");
-        var rtB = Atlas("ImagePadPrimAtlasB");
+        var rtA = Atlas("ImagePadPrimAtlasA" + suffix);
+        var rtB = Atlas("ImagePadPrimAtlasB" + suffix);
         var matA = Save(new Material(decShader) { name = "ImagePadPrimDecA" }, "ImagePadPrimDecA.mat");
         matA.SetTexture("_Src", rtB); matA.SetFloat("_Far", FarA);
         var matB = Save(new Material(decShader) { name = "ImagePadPrimDecB" }, "ImagePadPrimDecB.mat");
         matB.SetTexture("_Src", rtA); matB.SetFloat("_Far", FarB);
         var dispMat = Save(new Material(dispShader) { name = "ImagePadPrimDisplay" }, "ImagePadPrimDisplay.mat");
-        dispMat.SetTexture("_Atlas", rtA);
+        dispMat.SetTexture("_Atlas", rtA); dispMat.SetFloat("_Canvas", canvas);
+        foreach (var m in new[] { matA, matB })
+        {
+            m.SetFloat("_Canvas", canvas); m.SetFloat("_R", canvas); m.SetFloat("_NPrims", nPrims); m.SetFloat("_U", unitBits);
+            EditorUtility.SetDirty(m);
+        }
 
-        var root = new GameObject("ImagePadPrimDecoder");
+        var root = new GameObject("ImagePadPrimDecoder" + suffix);
         var quadMesh = Resources.GetBuiltinResource<Mesh>("Quad.fbx");
         var disp = new GameObject("Display");
         disp.transform.SetParent(root.transform, false);
@@ -117,15 +129,15 @@ public static class ImagePadPrimBuilder
 
         ImagePadMeasureBuilder.AddMergeAnimator(root, ctrl);
         ImagePadMeasureBuilder.AddParameters(root, 32);
-        PrefabUtility.SaveAsPrefabAsset(root, $"{Root}/ImagePadPrimDecoder.prefab");
+        PrefabUtility.SaveAsPrefabAsset(root, $"{Root}/ImagePadPrimDecoder{suffix}.prefab");
         UnityEngine.Object.DestroyImmediate(root);
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
-        Debug.Log("[ImagePad] built Assets/ImagePadMeasure/ImagePadPrimDecoder.prefab");
+        Debug.Log($"[ImagePad] built Assets/ImagePadMeasure/ImagePadPrimDecoder{suffix}.prefab");
     }
 
     public static void BuildBatch()
     {
-        try { Build(); EditorApplication.Exit(0); } catch (Exception e) { Debug.LogException(e); EditorApplication.Exit(1); }
+        try { Build(); Build512(); EditorApplication.Exit(0); } catch (Exception e) { Debug.LogException(e); EditorApplication.Exit(1); }
     }
 }
