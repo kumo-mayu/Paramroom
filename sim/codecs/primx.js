@@ -39,6 +39,10 @@ const T = require('../lib/transport');
 function geomWidths(cfg) {
   if (cfg.shape === 'tri') return [cfg.cb, cfg.cb, cfg.cb, cfg.cb, cfg.cb, cfg.cb];
   if (cfg.shape === 'ell') return cfg.circle ? [cfg.cb, cfg.cb, cfg.rb] : [cfg.cb, cfg.cb, cfg.rb, cfg.rb, cfg.ab];
+  // cap: centre, half length, half width, angle (the ellipse's fields, read as a capsule)
+  if (cfg.shape === 'cap') return [cfg.cb, cfg.cb, cfg.rb, cfg.rb, cfg.ab];
+  // mix: [type][centre][r1][r2][angle]; type 0 = ellipse, 1 = capsule
+  if (cfg.shape === 'mix') return [1, cfg.cb, cfg.cb, cfg.rb, cfg.rb, cfg.ab];
   if (cfg.shape === 'rect') return [cfg.cb, cfg.cb, cfg.cb, cfg.cb];
   throw new Error('shape ' + cfg.shape);
 }
@@ -84,6 +88,15 @@ function makeGeom(cfg) {
   const rN = 1 << (cfg.rb || 1), aN = 1 << (cfg.ab || 1);
   // codes -> float params in canvas pixel units, into g
   function geom(codes, g) {
+    if (shape === 'cap' || shape === 'mix') {
+      const o = shape === 'mix' ? 1 : 0;
+      g[0] = codes[o] / cmax * R; g[1] = codes[o + 1] / cmax * R;
+      g[2] = Math.max(0.5, R / 2 * ((codes[o + 2] + 1) / rN) ** 2);
+      g[3] = Math.max(0.5, R / 2 * ((codes[o + 3] + 1) / rN) ** 2);
+      g[4] = codes[o + 4] / aN * Math.PI;
+      g[5] = shape === 'mix' ? codes[0] : 1;   // 0 = ellipse, 1 = capsule
+      return;
+    }
     if (shape === 'ell') {
       g[0] = codes[0] / cmax * R; g[1] = codes[1] / cmax * R;
       g[2] = Math.max(0.5, R / 2 * ((codes[2] + 1) / rN) ** 2);
@@ -111,7 +124,27 @@ function makeGeom(cfg) {
           if ((w0 >= 0 && w1 >= 0 && w2 >= 0) || (w0 <= 0 && w1 <= 0 && w2 <= 0)) idx[n++] = row + x;
         }
       }
-    } else if (shape === 'ell') {
+    } else if ((shape === 'cap' || shape === 'mix') && g[5] === 1) {
+      // capsule: |u| beyond the half length falls off like a circular cap, |v| is the half width
+      const cx = g[0], cy = g[1], L = g[2], w = g[3], c = Math.cos(g[4]), s = Math.sin(g[4]);
+      const qMax = soft ? soft[soft.length - 1][0] : 1, ext = Math.sqrt(qMax);
+      const ex = ext * (Math.abs(c) * L + Math.abs(s) * w), ey = ext * (Math.abs(s) * L + Math.abs(c) * w);
+      const bx0 = Math.max(0, Math.floor(cx - ex - 0.5)), bx1 = Math.min(R - 1, Math.ceil(cx + ex));
+      const by0 = Math.max(0, Math.floor(cy - ey - 0.5)), by1 = Math.min(R - 1, Math.ceil(cy + ey));
+      const iw = 1 / (w * w);
+      for (let y = by0 + (st - by0 % st) % st; y <= by1; y += st) {
+        const dy = y + 0.5 - cy, row = y * R;
+        for (let x = bx0 + (st - bx0 % st) % st; x <= bx1; x += st) {
+          const dx = x + 0.5 - cx;
+          const u = dx * c + dy * s, v = dy * c - dx * s;
+          const du = Math.abs(u) - L, dd = du > 0 ? du : 0;
+          const q = (dd * dd + v * v) * iw;
+          if (q > qMax) continue;
+          if (wOut) { let ww = 0; for (let t = 0; t < soft.length; t++) if (q <= soft[t][0]) { ww = soft[t][1]; break; } wOut[n] = ww; }
+          idx[n++] = row + x;
+        }
+      }
+    } else if (shape === 'ell' || shape === 'mix') {
       const cx = g[0], cy = g[1], rx = g[2], ry = g[3], c = Math.cos(g[4]), s = Math.sin(g[4]);
       const qMax = soft ? soft[soft.length - 1][0] : 1, ext = Math.sqrt(qMax);
       const ex = ext * Math.sqrt(rx * rx * c * c + ry * ry * s * s), ey = ext * Math.sqrt(rx * rx * s * s + ry * ry * c * c);
@@ -174,7 +207,10 @@ function blendAdd(cur, idx, n, rgb, w = null) {
 // Configs
 function cfgOf(o) {
   const col = o.col || [5, 6, 5];
-  const geo = o.shape === 'ell' ? `e${o.cb}.${o.rb}.${o.ab}` : o.shape === 'tri' ? `t${o.cb}` : `q${o.cb}`;
+  const geo = o.shape === 'ell' ? `e${o.cb}.${o.rb}.${o.ab}`
+    : o.shape === 'cap' ? `k${o.cb}.${o.rb}.${o.ab}`
+    : o.shape === 'mix' ? `m${o.cb}.${o.rb}.${o.ab}`
+    : o.shape === 'tri' ? `t${o.cb}` : `q${o.cb}`;
   const soft = (o.soft ? '-s' + o.soft.map(([q, w]) => `${q}:${w}`).join('_') : '') + (o.circle ? '-circ' : '') + (o.blend === 'add' ? '-add' : '');
   const label = `${geo}-c${col.join('')}a${o.aBits || 0}-r${o.R}-n${o.maxPrims}${soft}`;
   return { alpha: 0.5, ...o, col, label };
@@ -357,6 +393,20 @@ module.exports = {
           codes[2 * v] = toCode(px + (rnd() * 2 - 1) * sz, 2 * v);
           codes[2 * v + 1] = toCode(py + (rnd() * 2 - 1) * sz, 2 * v + 1);
         }
+      } else if (cfg.shape === 'cap' || cfg.shape === 'mix') {
+        // capsules are drawn long and thin (that is what they are for); ellipses keep the usual shape
+        const o = cfg.shape === 'mix' ? 1 : 0;
+        if (o) codes[0] = rnd() < 0.5 ? 1 : 0;
+        const cap = cfg.shape === 'cap' || codes[0] === 1;
+        codes[o] = toCode(px, o); codes[o + 1] = toCode(py, o + 1);
+        if (cap) {
+          codes[o + 2] = radCode(sz * (0.3 + 0.7 * rnd()));
+          codes[o + 3] = radCode(Math.max(0.5, 6 * rnd() * rnd()));
+        } else {
+          codes[o + 2] = radCode(sz * (0.2 + 0.8 * rnd()));
+          codes[o + 3] = radCode(sz * (0.2 + 0.8 * rnd()));
+        }
+        codes[o + 4] = Math.floor(rnd() * (gmax[o + 4] + 1));
       } else if (cfg.shape === 'ell') {
         codes[0] = toCode(px, 0); codes[1] = toCode(py, 1);
         codes[2] = radCode(sz * (0.2 + 0.8 * rnd()));
@@ -366,18 +416,21 @@ module.exports = {
         codes[2] = toCode(px + rnd() * sz, 2); codes[3] = toCode(py + rnd() * sz, 3);
       }
     }
+    // the type bit of 'mix' (field 0) is never mutated: the other fields mean different things for the two types, so a
+    // flip would turn a good shape into a random one. Both types are seeded as random candidates instead.
+    const f0 = cfg.shape === 'mix' ? 1 : 0;
     function mutate(src, dst) {
       dst.set(src);
       const nf = rnd() < 0.3 ? 2 : 1;
-      let f = Math.floor(rnd() * ng);
+      let f = f0 + Math.floor(rnd() * (ng - f0));
       for (let t = 0; t < nf; t++) {
         const m = gmax[f];
         const span = rnd() < 0.5 ? 1 : Math.max(1, Math.round((m + 1) / 16 * rnd() * 2));
         let d = Math.round((rnd() * 2 - 1) * span);
         if (d === 0) d = rnd() < 0.5 ? -1 : 1;
-        if (cfg.shape === 'ell' && !cfg.circle && f === 4) dst[f] = (dst[f] + d + m + 1) % (m + 1); // angle wraps
+        if (f === f0 + 4 && cfg.shape !== 'tri' && cfg.shape !== 'rect' && !cfg.circle) dst[f] = (dst[f] + d + m + 1) % (m + 1); // angle wraps
         else dst[f] = Math.max(0, Math.min(m, dst[f] + d));
-        f = cfg.shape === 'tri' ? (f ^ 1) : Math.floor(rnd() * ng); // tri: move whole vertex
+        f = cfg.shape === 'tri' ? (f ^ 1) : f0 + Math.floor(rnd() * (ng - f0)); // tri: move whole vertex
       }
     }
 

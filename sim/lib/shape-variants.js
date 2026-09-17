@@ -28,6 +28,14 @@ const VARIANTS = {
   lightsoftdeep: { shape: 'ell', cb: 8, rb: 6, ab: 5, col: [4, 4, 4], aBits: 2, soft: SOFT3, ...DEEP },
   // how far does more search go? (for "is more compute worth it")
   deeper: { shape: 'ell', cb: 9, rb: 8, ab: 6, col: [5, 6, 5], aBits: 2, nRand: 2400, nClimb: 12, maxIter: 5000, maxAge: 400 },
+  // --- round 3: strokes for text (the user's idea). 'cap' reads the very same fields as a capsule (thick line
+  // segment), so the packet format does not change at all; 'mix' spends 1 bit per primitive on a type flag and lets
+  // the encoder pick an ellipse or a capsule for each one (the angle pays for the bit).
+  cap: { shape: 'cap', cb: 9, rb: 8, ab: 6, col: [5, 6, 5], aBits: 2 },
+  mix: { shape: 'mix', cb: 9, rb: 8, ab: 5, col: [5, 6, 5], aBits: 2 },
+  capdeep: { shape: 'cap', cb: 9, rb: 8, ab: 6, col: [5, 6, 5], aBits: 2, ...DEEP },
+  mixdeep: { shape: 'mix', cb: 9, rb: 8, ab: 5, col: [5, 6, 5], aBits: 2, ...DEEP },
+  mixsoftdeep: { shape: 'mix', cb: 9, rb: 8, ab: 5, col: [5, 6, 5], aBits: 2, soft: SOFT3, ...DEEP },
 };
 
 // maxPrims chosen so that every variant uses the same number of units

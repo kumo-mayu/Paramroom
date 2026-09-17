@@ -10,3 +10,9 @@ n 個届いた状態」を描いたもの。1 パケット 100 ms なので 20 �
 - `illust_chibi-grid.png`: 「最初に粗い画像（低解像度グリッド）を送る案」と現行の比較。現行が序盤から優る
 
 作り方: `node sim/shape-sheets.js <outDir> <image> <variants> <fracs>`、`node sim/grid-sheets.js <outDir> <image> <grids> <packets>`
+
+## 追加（文字用のストローク、docs/research/08 §14）
+
+- `screenshot_wikipedia-text.png` / `screenshot_mahara-text.png`: 本文の段落を**等倍**で切り出した比較。
+  現行(base)・ぼかし+探索強化(deepsoft)・カプセル(cap)・カプセル+探索強化(capdeep)・
+  種別bit+ぼかし+探索強化(mixsoftdeep)。カプセル系は文字の輪郭が明確に鮮明になる
