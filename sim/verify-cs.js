@@ -18,7 +18,7 @@ if (opt('fit') === 'crop') { const s = Math.min(src.w, src.h); src = I.crop(src,
 const target = I.resize(src, j.R, j.R);
 // layout of the decoder the units were made for: capacity (primitives) and packet size (Int parameters)
 const P = 8 * (j.bytes || 32) - 2;
-const cfg = { ...prim.cfgOf({ shape: 'ell', cb: j.R >= 1024 ? 10 : 9, rb: 8, ab: 6, col: [5, 6, 5], aBits: 2, R: j.R, maxPrims: j.capacity || j.n }), out: j.R };
+const cfg = { ...prim.cfgOf({ shape: 'ell', cb: j.cb ?? (j.R >= 1024 ? 10 : 9), rb: j.rb ?? 8, ab: j.ab ?? 6, col: j.col ?? [5, 6, 5], aBits: j.aBits ?? 2, R: j.R, maxPrims: j.capacity || j.n }), out: j.R };
 const L = prim.layout(cfg, P);
 if (j.units.length > L.units) throw new Error(`too many units ${j.units.length} > ${L.units}`);
 const dec = prim.decoder(cfg, P);
