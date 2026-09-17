@@ -1,0 +1,20 @@
+start1 unix 1789639178601
+loaded 1001 units (R 512, n 4000, aspect 165) from measure/logs/cs/kodim23-512-4000.json
+looking for VRChat clients (OSCQuery)...
+  VRChat-Client-120C0C: OSC 127.0.0.1:9000, avatar avtr_675281ab-59db-4bbe-a14b-174d583260f1, ImagePad params 32/32
+  VRChat-Client-1A1A1D: OSC 127.0.0.1:9010, avatar , ImagePad params 0/32 (D0 missing)
+-> sending to VRChat-Client-120C0C
+aspect code 165 (w/h 1.498); sending to 127.0.0.1:9000: epoch 2, hold 100 ms, OSC bundle. Ctrl+C to stop.
+0 packets sent (0 s)   50 packets sent (5 s)   100 packets sent (10 s)   150 packets sent (15 s)   200 packets sent (20 s)   250 packets sent (25 s)   300 packets sent (30 s)   350 packets sent (35 s)   400 packets sent (40 s)   450 packets sent (45 s)   500 packets sent (50 s)   550 packets sent (55 s)   600 packets sent (60 s)   650 packets sent (65 s)   700 packets sent (70 s)   750 packets sent (75 s)   800 packets sent (80 s)   850 packets sent (85 s)   900 packets sent (90 s)   950 packets sent (95 s)   1000 packets sent (100 s)   1050 packets sent (105 s)   1100 packets sent (110 s)   1150 packets sent (115 s)   1200 packets sent (120 s)   1250 packets sent (125 s)   1300 packets sent (130 s)   1350 packets sent (135 s)   1400 packets sent (140 s)   1450 packets sent (145 s)   1500 packets sent (150 s)   
+
+start2 unix 1789639332071
+encoding sim/images/src/screenshot_wikipedia.png (e9.8.6-c565a2-r512-n4000, 1001 units, 16 threads)...
+  250/4003 primitives     500/4003 primitives     750/4003 primitives     1000/4003 primitives     1250/4003 primitives     1500/4003 primitives     1750/4003 primitives     2000/4003 primitives     2250/4003 primitives     2500/4003 primitives     2750/4003 primitives     3000/4003 primitives     3250/4003 primitives     3500/4003 primitives     3750/4003 primitives     4000/4003 primitives   encoded 4003 primitives -> 1001 units in 2.14 s
+looking for VRChat clients (OSCQuery)...
+  VRChat-Client-120C0C: OSC 127.0.0.1:9000, avatar avtr_675281ab-59db-4bbe-a14b-174d583260f1, ImagePad params 32/32
+  VRChat-Client-1A1A1D: OSC 127.0.0.1:9010, avatar , ImagePad params 0/32 (D0 missing)
+-> sending to VRChat-Client-120C0C
+aspect code 71 (w/h 0.537); sending to 127.0.0.1:9000: epoch 3, hold 100 ms, OSC bundle. Ctrl+C to stop.
+0 packets sent (0 s)   50 packets sent (5 s)   100 packets sent (10 s)   150 packets sent (15 s)   200 packets sent (20 s)   250 packets sent (25 s)   300 packets sent (30 s)   350 packets sent (35 s)   400 packets sent (40 s)   450 packets sent (45 s)   500 packets sent (50 s)   550 packets sent (55 s)   600 packets sent (60 s)   650 packets sent (65 s)   700 packets sent (70 s)   750 packets sent (75 s)   800 packets sent (80 s)   850 packets sent (85 s)   900 packets sent (90 s)   950 packets sent (95 s)   1000 packets sent (100 s)   1050 packets sent (105 s)   1100 packets sent (110 s)   1150 packets sent (115 s)   1200 packets sent (120 s)   1250 packets sent (125 s)   1300 packets sent (130 s)   1350 packets sent (135 s)   1400 packets sent (140 s)   1450 packets sent (145 s)   1500 packets sent (150 s)   
+
+end unix 1789639488171
