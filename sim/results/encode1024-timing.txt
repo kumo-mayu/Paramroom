@@ -1,0 +1,3 @@
+R1024 cb9 n1000 251 units u 8 spare 14 36.9 s
+R1024 cb10 n1000 251 units u 8 spare 6 37.6 s
+R1024 cb9 n2000 501 units u 9 spare 13 56.1 s
