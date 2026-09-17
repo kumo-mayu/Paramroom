@@ -1,7 +1,7 @@
 // imagepad: prim encoder + OSC sender for the ImagePad avatar decoder (C# port of measure/osc/send-image.js).
 //
-//   imagepad send   <image> [--R 512] [--n 4000] [--fit stretch|crop] [--epoch 1] [--hold 100] [--duration 0]
-//                           [--host 127.0.0.1] [--port 9000] [--no-bundle] [--schedule sqrt|carousel] [--seed N]
+//   imagepad send   <image> [--R 512] [--n 4000] [--fit stretch|crop] [--epoch 1] [--hold 100] [--duration 0] [--wait 3]
+//                           [--host 127.0.0.1] [--port 9000] [--no-bundle] [--schedule sqrt|fast|carousel] [--seed N]
 //   imagepad encode <image> [--R 512] [--n 4000] [--fit ...] [--out units.json] [--png canvas.png] [--threads N]
 //   imagepad send   --units units.json [--epoch ..] ...      (send a previously encoded image)
 //   imagepad list                                             (VRChat clients found with OSCQuery)
@@ -109,8 +109,15 @@ if (cmd == "send")
     bool bundle = !Flag("no-bundle");
     var packets = Packets.Build(units, epoch, aspect);
     Func<int, int> schedule;
-    if ((Opt("schedule") ?? "sqrt") == "sqrt") { var s = new SqrtSchedule(gains); schedule = k => s[k]; }
-    else schedule = k => k % packets.Length;
+    // sqrt: square-root rule from the start (late joiners); fast: every unit once in greedy order first (viewers already
+    // present get more detail sooner, e.g. 512/4000 at 10 s 0.892 vs 0.871), then the square-root rule; carousel: units in
+    // order, repeated.
+    // sim/results/fastfirst.md: fast is worse for viewers joining during the first pass (N x 100 ms).
+    string sched = Opt("schedule") ?? "sqrt";
+    int N = packets.Length;
+    if (sched == "sqrt") { var s = new SqrtSchedule(gains); schedule = k => s[k]; }
+    else if (sched == "fast") { var s = new SqrtSchedule(gains); schedule = k => k < N ? k : s[k - N]; }
+    else schedule = k => k % N;
     Console.WriteLine($"aspect code {aspect} (w/h {Aspect.Ratio(aspect):F3}); sending to {host}:{port}: epoch {epoch}, hold {hold} ms, {(bundle ? "OSC bundle" : "single messages")}. Ctrl+C to stop.");
     OscSender.Run(packets, schedule, host, port, hold, duration, bundle);
 }
