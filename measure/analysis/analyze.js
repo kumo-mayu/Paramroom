@@ -21,7 +21,8 @@ function readCsv(p) {
   return lines.slice(1).map(l => { const v = l.split(','); const o = {}; head.forEach((h, i) => (o[h] = isNaN(+v[i]) ? v[i] : +v[i])); return o; });
 }
 const frames = readCsv(decodedPath).filter(r => r.valid === 1);
-const sent = [].concat(...logPath.split('+').map(readCsv)); // several logs can be joined with '+'
+// several logs can be joined with '+'; each log's sendStartMs has its own time base, so use unixMs as the common clock
+const sent = [].concat(...logPath.split('+').map(readCsv)).map(r => ({ ...r, sendStartMs: r.unixMs }));
 const sentKeys = new Set(sent.map(s => `${s.epoch}:${s.seq}`));
 const fps = (() => { const f = frames.find(r => r.frame > 0); return f ? f.frame / (f.timeMs / 1000) : 60; })();
 const frameMs = 1000 / fps;
