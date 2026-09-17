@@ -41,6 +41,23 @@ const GRIDS = {
     policy: [{ type: 'prio', period: 4, base: 8, label: 'prio4b8' }, { type: 'prio', period: 4, base: 16, label: 'prio4b16' }, { type: 'prio', period: 8, base: 8, label: 'prio8b8' }],
     capSeconds: [30, 90], times: TIMES, seeds: 8,
   },
+  // ---- grids with the measured channel (sampler meas60) ----
+  // torn: 0.007 = OSC bundle, 0.06 = individual OSC messages (measured)
+  mselect: {
+    channels: [{ name: 'm100b', sampler: 'meas60', H: 0.1, torn: 0.007 }],
+    join: [0], policy: [{ type: 'carousel' }], capSeconds: [60], times: TIMES, seeds: 4,
+  },
+  mfull: {
+    channels: [
+      { name: 'm083b', sampler: 'meas60', H: 1 / 12, torn: 0.007 },
+      { name: 'm100b', sampler: 'meas60', H: 0.1, torn: 0.007 },
+      { name: 'm117b', sampler: 'meas60', H: 7 / 60, torn: 0.007 },
+      { name: 'm100i', sampler: 'meas60', H: 0.1, torn: 0.06 },
+    ],
+    join: [0, 'rand'],
+    policy: [{ type: 'carousel' }, { type: 'tier' }, { type: 'prio', period: 4, base: 8, label: 'prio4b8' }],
+    capSeconds: [30, 90], times: TIMES, seeds: 6,
+  },
   // CRC comparison for B=32 (CRC-8 does not fit most codecs)
   crc32: {
     channels: [{ name: 'bm14', sampler: 'bmfit', H: 0.14 }, { name: 'bm14torn', sampler: 'bmfit', H: 0.14, torn: 0.05 }],

@@ -17,7 +17,7 @@
 //  * Late join: the receiver only gets snapshots taken at/after its join time.
 
 const EPOCH_BITS = 2;
-const LATENCY = 0.15;
+const LATENCY = 0.115; // measured 100-130 ms (was 0.15 hypothesis)
 
 function mulberry32(seed) {
   return function () {
@@ -93,6 +93,16 @@ function sampleTimes(sampler, rnd, tEnd) {
   } else if (sampler === 'bmfit') {
     let t = rnd() * 0.14;
     while (t < tEnd) { out.push(t); t += 0.1 + 0.08 * rnd(); }
+  } else if (sampler === 'meas60') {
+    // Fitted to in-game measurements 2026-09-17 (desktop, 60 fps, docs/measure/results-2026-09-17.md):
+    // loss 11.4% at hold 80 ms, ~0% at >=100 ms; remote update intervals centred on 83-100 ms.
+    // interval ~ U[70, 105] ms (mean 87.5 ms); rare hitches (0.1% of samples) add U[300, 900] ms.
+    let t = rnd() * 0.0875;
+    while (t < tEnd) {
+      out.push(t);
+      t += 0.07 + 0.035 * rnd();
+      if (rnd() < 0.001) t += 0.3 + 0.6 * rnd();
+    }
   } else throw new Error('unknown sampler ' + sampler);
   return out;
 }
