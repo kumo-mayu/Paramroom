@@ -216,7 +216,7 @@ public static class ImagePadMeasureBuilder
         return p;
     }
 
-    static void AddMergeAnimator(GameObject root, RuntimeAnimatorController ctrl)
+    internal static void AddMergeAnimator(GameObject root, RuntimeAnimatorController ctrl)
     {
         var t = FindType("nadena.dev.modular_avatar.core.ModularAvatarMergeAnimator");
         if (t == null) { Debug.LogWarning("[ImagePad] Modular Avatar not found: add the FX controller to your avatar manually."); return; }
@@ -233,7 +233,7 @@ public static class ImagePadMeasureBuilder
         so.ApplyModifiedPropertiesWithoutUndo();
     }
 
-    static void AddParameters(GameObject root, int byteCount)
+    internal static void AddParameters(GameObject root, int byteCount)
     {
         var t = FindType("nadena.dev.modular_avatar.core.ModularAvatarParameters");
         if (t == null) { Debug.LogWarning("[ImagePad] Modular Avatar not found: add D0..D(n-1) Int synced parameters manually."); return; }
@@ -435,5 +435,93 @@ public static class ImagePadMeasureAnimatorTest
         bool pass = expectStale ? bad > 0 : bad == 0;
         Debug.Log($"[ImagePad] {label}: {(pass ? "PASS" : "FAIL")} (mismatching steps {bad}, expectStale={expectStale})");
         return pass ? 0 : 1;
+    }
+}
+
+public static class ImagePadPrimTest
+{
+    // batchmode (with graphics): -executeMethod ImagePadPrimTest.Run -imagepadOut <dir>
+    // Feeds exported prim packets (TestData/prim-kodim23.json) into the PrimDecoder camera loop by setting material
+    // properties directly (as the FX blend tree would), renders, and saves the display canvas + timing.
+    public static void Run()
+    {
+        var args = Environment.GetCommandLineArgs();
+        int oi = Array.IndexOf(args, "-imagepadOut");
+        string outDir = oi >= 0 ? args[oi + 1] : "ImagePadPrimTest";
+        System.IO.Directory.CreateDirectory(outDir);
+        try
+        {
+            var json = System.IO.File.ReadAllText("Assets/ImagePadMeasure/TestData/prim-kodim23.json");
+            int pi = json.IndexOf("\"packets\"");
+            var nums = System.Text.RegularExpressions.Regex.Matches(json.Substring(pi), "[0-9]+").Cast<System.Text.RegularExpressions.Match>().Select(m => int.Parse(m.Value)).ToList();
+            int nPackets = nums.Count / 32;
+            var shader = Shader.Find("ImagePad/PrimDecoder");
+            if (shader == null) throw new Exception("PrimDecoder shader missing");
+            RenderTexture MakeAtlas() { var d = new RenderTextureDescriptor(512, 288, RenderTextureFormat.ARGBHalf, 0) { sRGB = false }; var rt = new RenderTexture(d) { filterMode = FilterMode.Point }; rt.Create(); return rt; }
+            var rtA = MakeAtlas(); var rtB = MakeAtlas();
+            var quadMesh = Resources.GetBuiltinResource<Mesh>("Quad.fbx");
+            Material matA = new Material(shader), matB = new Material(shader);
+            Camera MakeCam(Vector3 pos, RenderTexture target, Material mat, RenderTexture src, float far)
+            {
+                var go = new GameObject("primcam") { layer = 12 };
+                go.transform.position = pos;
+                var cam = go.AddComponent<Camera>();
+                cam.orthographic = true; cam.orthographicSize = 0.01f; cam.nearClipPlane = 0.001f; cam.farClipPlane = far;
+                cam.clearFlags = CameraClearFlags.Nothing; cam.cullingMask = 1 << 12; cam.targetTexture = target;
+                cam.allowHDR = false; cam.allowMSAA = false; cam.enabled = false;
+                var q = new GameObject("primquad") { layer = 12 };
+                q.transform.SetParent(go.transform, false);
+                q.transform.localPosition = new Vector3(0, 0, 0.012f);
+                q.transform.localScale = Vector3.one * 0.1f;
+                q.AddComponent<MeshFilter>().sharedMesh = quadMesh;
+                mat.SetTexture("_Src", src); mat.SetFloat("_Far", far);
+                q.AddComponent<MeshRenderer>().sharedMaterial = mat;
+                return cam;
+            }
+            var camA = MakeCam(new Vector3(200, 0, 0), rtA, matA, rtB, 0.0217f);
+            var camB = MakeCam(new Vector3(200, 0, 5), rtB, matB, rtA, 0.0219f);
+            void SetPacket(int k)
+            {
+                for (int b = 0; b < 32; b++) { float v = nums[k * 32 + b]; matA.SetFloat($"_P{b}", v); matB.SetFloat($"_P{b}", v); }
+            }
+            void Step() { camA.Render(); camB.Render(); }
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            for (int k = 0; k < nPackets; k++) { SetPacket(k); Step(); }
+            // run full redraw cycles with the last packet held
+            int nBatches = (1003 + 31) / 32;
+            for (int s = 0; s < nBatches * 2 + 2; s++) Step();
+            var tex = new Texture2D(512, 288, TextureFormat.RGBAHalf, false);
+            RenderTexture.active = rtA;
+            tex.ReadPixels(new Rect(0, 0, 512, 288), 0, 0);
+            tex.Apply();
+            RenderTexture.active = null;
+            sw.Stop();
+            int steps = nPackets + nBatches * 2 + 2;
+            // timing of pure redraw steps (GPU synced by a 1x1 readback)
+            var probe = new Texture2D(1, 1, TextureFormat.RGBAHalf, false);
+            var sw2 = System.Diagnostics.Stopwatch.StartNew();
+            for (int s = 0; s < 120; s++) Step();
+            RenderTexture.active = rtA; probe.ReadPixels(new Rect(0, 0, 1, 1), 0, 0); probe.Apply(); RenderTexture.active = null;
+            sw2.Stop();
+            // dump display region as PNG (0..255 values)
+            var outTex = new Texture2D(256, 256, TextureFormat.RGB24, false);
+            var px = tex.GetPixels();
+            var o = new Color32[256 * 256];
+            for (int y = 0; y < 256; y++)
+                for (int x = 0; x < 256; x++)
+                {
+                    var c = px[y * 512 + 256 + x];
+                    o[y * 256 + x] = new Color32((byte)Mathf.Clamp(Mathf.Round(c.r), 0, 255), (byte)Mathf.Clamp(Mathf.Round(c.g), 0, 255), (byte)Mathf.Clamp(Mathf.Round(c.b), 0, 255), 255);
+                }
+            outTex.SetPixels32(o);
+            outTex.Apply();
+            System.IO.File.WriteAllBytes(System.IO.Path.Combine(outDir, "prim-display.png"), outTex.EncodeToPNG());
+            // store sanity: count present primitives
+            int present = 0;
+            for (int j = 0; j < 1003; j++) { int t = 2 * j + 1; var c = px[(256 + t / 512) * 512 + t % 512]; if (((int)Mathf.Round(c.a) & 1) == 1) present++; }
+            Debug.Log($"[ImagePad] prim test: packets={nPackets} steps={steps} total={sw.ElapsedMilliseconds}ms, redraw 120 steps={sw2.ElapsedMilliseconds}ms ({sw2.ElapsedMilliseconds / 120.0:F2} ms/step) present={present} counter={px[280 * 512].r} epoch={px[280 * 512 + 1].r}");
+            EditorApplication.Exit(0);
+        }
+        catch (Exception e) { Debug.LogException(e); EditorApplication.Exit(1); }
     }
 }
