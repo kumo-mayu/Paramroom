@@ -9,3 +9,6 @@ measure/unity/**/Library/
 measure/unity/**/Temp/
 *.tmp*
 measure/analysis/synthetic/
+# .NET build output
+tools/**/bin/
+tools/**/obj/
