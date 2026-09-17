@@ -67,8 +67,10 @@ public sealed record SessionSnapshot(
     IReadOnlyList<VrcClient> Targets,
     VrcClient? Target,
     string Schedule,
+    // milliseconds each packet is held before the next one is sent
+    double HoldMs,
     SendState Send)
 {
     public static SessionSnapshot Initial { get; } = new(
-        null, FitMode.Stretch, new EncodeState.Idle(), false, Array.Empty<VrcClient>(), null, Schedules.Default, new SendState.Idle());
+        null, FitMode.Stretch, new EncodeState.Idle(), false, Array.Empty<VrcClient>(), null, Schedules.Default, 100, new SendState.Idle());
 }

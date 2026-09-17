@@ -205,3 +205,23 @@ public class SessionTests
         finally { File.Delete(path); }
     }
 }
+
+public class HoldTests
+{
+    sealed class NoFinder : ITargetFinder
+    {
+        public Task<IReadOnlyList<VrcClient>> FindAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<VrcClient>>(Array.Empty<VrcClient>());
+    }
+
+    [Fact]
+    public async Task IntervalIsValidatedAndPublished()
+    {
+        await using var session = new ImagePadSession(new NoFinder(), _ => throw new InvalidOperationException(), new StbImageDecoder(), new HttpImageFetcher());
+        var handler = new CommandHandler(session);
+        Assert.Equal(100, session.Snapshot.HoldMs);
+        Assert.IsType<CommandResult.Done>(await handler.ExecuteAsync(new UiCommand.SetHold(150)));
+        Assert.Equal(150, session.Snapshot.HoldMs);
+        Assert.IsType<CommandResult.Failed>(await handler.ExecuteAsync(new UiCommand.SetHold(10)));
+        Assert.Equal(150, session.Snapshot.HoldMs);
+    }
+}

@@ -7,7 +7,7 @@ namespace ImagePad.Session;
 
 public sealed class SessionOptions
 {
-    public double HoldMs { get; init; } = 100;                 // measured: 100 ms per packet keeps loss near 0 (docs/measure)
+    public double HoldMs { get; init; } = 100;                 // initial interval; measured: 100 ms keeps loss near 0, 80 ms lost 11% (docs/measure)
     public int? EncodePrimsLimit { get; init; }                 // fewer primitives than the decoder holds (tests, quick sends)
     public TimeSpan ProgressInterval { get; init; } = TimeSpan.FromMilliseconds(250);
     // a render of 4000 primitives at 512 px takes tens of ms; twice a second is enough to watch the image build up
@@ -35,6 +35,17 @@ public sealed class ImagePadSession : IAsyncDisposable
     {
         this.finder = finder; this.transportFactory = transportFactory; this.decoder = decoder; this.fetcher = fetcher;
         this.options = options ?? new SessionOptions();
+        snapshot = snapshot with { HoldMs = this.options.HoldMs };
+    }
+
+    // VRChat syncs parameters about every 83-100 ms; much faster sends are dropped, much slower ones only waste time.
+    public const double MinHoldMs = 50, MaxHoldMs = 1000;
+
+    public void SetHold(double milliseconds)
+    {
+        if (double.IsNaN(milliseconds) || milliseconds < MinHoldMs || milliseconds > MaxHoldMs)
+            throw new ImageSourceException($"送信の間隔は {MinHoldMs}〜{MaxHoldMs} ミリ秒で指定してください。");
+        Update(s => s with { HoldMs = milliseconds });
     }
 
     public event Action<SessionSnapshot>? SnapshotChanged;
@@ -245,9 +256,10 @@ public sealed class ImagePadSession : IAsyncDisposable
         try
         {
             using var timer = TimerResolution.Begin();
-            for (int k = 0; !ct.IsCancellationRequested; k++)
+            // the next send time advances by the current interval, so a change applies from the next packet
+            double target = 0;
+            for (int k = 0; !ct.IsCancellationRequested; k++, target += Snapshot.HoldMs)
             {
-                double target = k * options.HoldMs;
                 while (sw.Elapsed.TotalMilliseconds < target - 2 && !ct.IsCancellationRequested) Thread.Sleep(1);
                 while (sw.Elapsed.TotalMilliseconds < target && !ct.IsCancellationRequested) Thread.SpinWait(50);
                 if (ct.IsCancellationRequested) break;

@@ -24,6 +24,9 @@ public abstract record UiCommand
 
     public sealed record SetSchedule(string Schedule) : UiCommand;
 
+    // packet interval in ms; applies immediately, also while sending
+    public sealed record SetHold(double Milliseconds) : UiCommand;
+
     // starts sending the encoded image with the next epoch; while sending, restarts with the current image
     public sealed record StartSending() : UiCommand;
 

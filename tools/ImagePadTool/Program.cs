@@ -110,6 +110,12 @@ else
     if (fit == "crop") { int s = Math.Min(img.W, img.H); img = img.Crop((img.W - s) >> 1, (img.H - s) >> 1, s, s); }
     img = img.Resize(R, R);
     var cfg = new PrimConfig { R = R, MaxPrims = n, LayoutPrims = capacity, Cb = R >= 1024 ? 10 : 9 };
+    // precision experiments (bits per field); the avatar decoder must be built with the same widths
+    if (Opt("cb") is string ocb) cfg.Cb = int.Parse(ocb);
+    if (Opt("rb") is string orb) cfg.Rb = int.Parse(orb);
+    if (Opt("ab") is string oab) cfg.Ab = int.Parse(oab);
+    if (Opt("abits") is string oal) cfg.ABits = int.Parse(oal);
+    if (Opt("col") is string ocol) cfg.Col = ocol.Split(',').Select(int.Parse).ToArray();
     if (Opt("seed") is string seed) cfg.Seed = uint.Parse(seed);
     var L = PrimLayout.Of(cfg, P);
     if (L.SpareBits < 8) throw new InvalidOperationException("no spare byte for the aspect code");
@@ -122,7 +128,7 @@ else
         using var fs = File.Create(outFile);
         using var w = new Utf8JsonWriter(fs);
         w.WriteStartObject();
-        w.WriteString("image", file); w.WriteString("cfg", cfg.Label); w.WriteNumber("R", R); w.WriteNumber("n", n); w.WriteNumber("capacity", capacity); w.WriteNumber("bytes", nBytes); w.WriteNumber("aspect", aspect);
+        w.WriteString("image", file); w.WriteString("cfg", cfg.Label); w.WriteNumber("cb", cfg.Cb); w.WriteNumber("rb", cfg.Rb); w.WriteNumber("ab", cfg.Ab); w.WriteNumber("aBits", cfg.ABits); w.WriteStartArray("col"); foreach (var cc in cfg.Col) w.WriteNumberValue(cc); w.WriteEndArray(); w.WriteNumber("R", R); w.WriteNumber("n", n); w.WriteNumber("capacity", capacity); w.WriteNumber("bytes", nBytes); w.WriteNumber("aspect", aspect);
         w.WriteNumber("encSec", res.Seconds); w.WriteNumber("prims", res.Prims);
         w.WriteStartArray("units"); foreach (var u in units) w.WriteStringValue(new string(u.Select(b => b ? '1' : '0').ToArray())); w.WriteEndArray();
         w.WriteStartArray("gains"); foreach (var g in gains) { if (double.IsFinite(g)) w.WriteNumberValue(g); else w.WriteNullValue(); } w.WriteEndArray();

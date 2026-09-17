@@ -133,6 +133,9 @@
                         <ComboBox ItemsSource="{Binding ScheduleOptions}" SelectedItem="{Binding SelectedSchedule}" DisplayMemberPath="Label"
                                   AutomationProperties.Name="送り方" IsEnabled="{Binding IsSending, Mode=OneWay, Converter={x:Static vm:Converters.Not}}" />
                         <TextBlock Style="{StaticResource Note}" Text="{Binding SelectedSchedule.Description}" />
+                        <TextBlock Text="送信の間隔（送信中も変えられます）" Margin="0,10,0,4" />
+                        <ComboBox ItemsSource="{Binding HoldOptions}" SelectedItem="{Binding SelectedHold}" DisplayMemberPath="Label" AutomationProperties.Name="送信の間隔" />
+                        <TextBlock Style="{StaticResource Note}" Text="{Binding SelectedHold.Description}" />
                         <Button Content="{Binding StartStopText}" Command="{Binding StartStopCommand}" Margin="0,12,0,0" MinHeight="40" FontSize="15" FontWeight="SemiBold" />
                         <ProgressBar Height="6" Maximum="1" Value="{Binding SendProgress, Mode=OneWay}" Margin="0,10,0,0" />
                         <TextBlock Text="{Binding SendText}" TextWrapping="Wrap" Margin="0,6,0,0" />

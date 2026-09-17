@@ -19,6 +19,7 @@ public sealed class CommandHandler(ImagePadSession session)
                 case UiCommand.RefreshTargets: await session.RefreshTargetsAsync(); break;
                 case UiCommand.SelectTarget c: session.SelectTarget(c.Name); break;
                 case UiCommand.SetSchedule c: session.SetSchedule(c.Schedule); break;
+                case UiCommand.SetHold c: session.SetHold(c.Milliseconds); break;
                 case UiCommand.StartSending: await session.StartSendingAsync(); break;
                 case UiCommand.StopSending: await session.StopSendingAsync(); break;
                 default: return new CommandResult.Failed($"未対応の操作です: {command.GetType().Name}");

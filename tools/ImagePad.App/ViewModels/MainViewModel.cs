@@ -10,9 +10,12 @@ using ImagePad.Session;
 
 namespace ImagePad.App.ViewModels;
 
-public sealed record ScheduleOption(string Name, string Label, string Description);
+// ToString は読み上げ・UI Automation に出る名前（record の既定だと中身を全部並べてしまう）
+public sealed record ScheduleOption(string Name, string Label, string Description) { public override string ToString() => Label; }
 
-public sealed record TargetOption(string Name, string Label, bool Usable);
+public sealed record TargetOption(string Name, string Label, bool Usable) { public override string ToString() => Label; }
+
+public sealed record HoldOption(double Milliseconds, string Label, string Description) { public override string ToString() => Label; }
 
 public sealed class MainViewModel : ViewModelBase
 {
@@ -45,6 +48,28 @@ public sealed class MainViewModel : ViewModelBase
         new ScheduleOption("fast", "今いる人を優先", "今見ている人に一番速く届きます。途中から来た人には、1 周が終わるまで崩れた絵が見えます。"),
         new ScheduleOption("sqrt", "途中から来る人を優先", "いつ来た人にも同じ速さで届きます。今見ている人には少し遅くなります。"),
     };
+
+    // 実測（2026-09-17、docs/measure）：受け側の更新は約 83〜100 ms ごと。100 ms で取りこぼしはほぼ 0、80 ms では 11% 落ちた
+    public IReadOnlyList<HoldOption> HoldOptions { get; } = new[]
+    {
+        new HoldOption(67, "67 ミリ秒（速い・取りこぼしが多い）", "実測では 100 ミリ秒より短いとパケットを取りこぼしました。届く速さはあまり上がらないことがあります。"),
+        new HoldOption(83, "83 ミリ秒（やや速い）", "実測では 80 ミリ秒で 1 割ほど取りこぼしました。混んでいないワールド向けです。"),
+        new HoldOption(100, "100 ミリ秒（おすすめ）", "実測で取りこぼしがほぼ無かった間隔です。"),
+        new HoldOption(117, "117 ミリ秒", "少し余裕を持たせた間隔です。"),
+        new HoldOption(150, "150 ミリ秒（ゆっくり）", "人が多く、同期が遅れがちなワールド向けです。"),
+        new HoldOption(200, "200 ミリ秒（とてもゆっくり）", "届くのは遅くなりますが、取りこぼしはさらに起きにくくなります。"),
+    };
+
+    HoldOption? selectedHold;
+    public HoldOption? SelectedHold
+    {
+        get => selectedHold;
+        set
+        {
+            if (!SetField(ref selectedHold, value) || value is null || applying) return;
+            Run(new UiCommand.SetHold(value.Milliseconds));
+        }
+    }
 
     // ---- 画像
 
@@ -215,7 +240,7 @@ public sealed class MainViewModel : ViewModelBase
             if (old?.Fit != s.Fit) { fitCrop = s.Fit == FitMode.Crop; OnPropertyChanged(nameof(FitStretch)); OnPropertyChanged(nameof(FitCrop)); }
 
             // 変換
-            if (!ReferenceEquals(old?.Encode, s.Encode))
+            if (!ReferenceEquals(old?.Encode, s.Encode) || old?.HoldMs != s.HoldMs)
             {
                 IsEncoding = s.Encode is EncodeState.Running;
                 switch (s.Encode)
@@ -229,9 +254,9 @@ public sealed class MainViewModel : ViewModelBase
                         break;
                     case EncodeState.Ready ready:
                         var img = ready.Image;
-                        if (!ReferenceEquals((old?.Encode as EncodeState.Ready)?.Image, img)) EncodedImage = ToBitmap(img.Preview);
+                        if (!ReferenceEquals((old?.Encode as EncodeState.Ready)?.Image, img) || EncodedImage is null) EncodedImage = ToBitmap(img.Preview);
                         EncodeProgress = 1;
-                        double lap = img.Units.Count * 0.1;
+                        double lap = img.Units.Count * s.HoldMs / 1000;
                         EncodeText = $"変換しました：図形 {img.Prims} 個、{img.Units.Count} パケット（1 周 約 {FormatDuration(TimeSpan.FromSeconds(lap))}）。" +
                                      $"{img.Spec.Canvas}px・Int {img.Spec.Ints} 個のアバター向け{(img.Spec.Assumed ? "（アバターの種類が分からないため既定の設定）" : "")}";
                         break;
@@ -257,6 +282,9 @@ public sealed class MainViewModel : ViewModelBase
                     : s.Targets.Any(ImagePadSession.IsUsable) ? "送信先を選んでください。"
                     : "見つかった VRChat のアバターに ImagePad が入っていません。ImagePad 入りのアバターに着替えてから「探し直す」を押してください。";
             }
+
+            if (old?.HoldMs != s.HoldMs)
+                SelectedHold = HoldOptions.FirstOrDefault(o => o.Milliseconds == s.HoldMs) ?? new HoldOption(s.HoldMs, $"{s.HoldMs} ミリ秒", "");
 
             if (!ReferenceEquals(old?.Schedule, s.Schedule))
                 SelectedSchedule = ScheduleOptions.FirstOrDefault(o => o.Name == s.Schedule) ?? new ScheduleOption(s.Schedule, s.Schedule, "");
