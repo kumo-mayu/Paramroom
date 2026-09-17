@@ -37,6 +37,7 @@ imagepad send --units units.json                # 保存したエンコード結
 - **送信順（`--schedule`）**
   - `sqrt`（既定）：最初から平方根則で送る。途中参加に強い。
   - `fast`：1 周目は全ユニットを重要な順に 1 回ずつ送り、2 周目から平方根則に切り替える。開始時から見ている人には速い（512/4000 で 5 s：0.842 対 0.818、60 s：0.965 対 0.952）。ただし 1 周目（約 100 s）の途中に入った人には大きく遅れる（5 s：0.478 対 0.729）。`sim/results/fastfirst.md`
+  - `fast+sqrt/k`、`fast+sqrtB/k`、`fast+baseB/k`：fast の 1 周目の k スロットに 1 回、平方根則（先頭 B ユニットに限定も可）や先頭 B ユニットの再送を挟み、途中参加の人にも粗い像を早く出す。例：`--schedule fast+sqrt32/8`。比較は `measure/results/2026-09-17/fastfirst/README.md`。
   - `carousel`：巡回のみ。
 - **その他のオプション**
   - `--fit crop`：中央を正方形に切り出す。

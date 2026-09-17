@@ -130,3 +130,23 @@ public static class OscSender
         finally { timeEndPeriod(1); }
     }
 }
+
+// sim/lib/schedules-ff.js firstPassWith: units 0..N-1 once, every k-th slot taken by filler(i), then after(i)
+public static class FirstPass
+{
+    public static Func<int, int> With(int n, int k, Func<int, int> filler, Func<int, int> after)
+    {
+        var seq = new List<int>();
+        int next = 0, fk = 0, ak = 0;
+        return slot =>
+        {
+            while (seq.Count <= slot)
+            {
+                int j = seq.Count;
+                if (next < n) seq.Add(k > 0 && j % k == k - 1 ? filler(fk++) : next++);
+                else seq.Add(after(ak++));
+            }
+            return seq[slot];
+        };
+    }
+}
