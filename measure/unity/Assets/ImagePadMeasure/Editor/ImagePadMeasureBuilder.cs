@@ -249,3 +249,122 @@ public static class ImagePadMeasureBuilder
         so.ApplyModifiedPropertiesWithoutUndo();
     }
 }
+
+public static class ImagePadMeasureShaderCheck
+{
+    // batchmode (with graphics): -executeMethod ImagePadMeasureShaderCheck.Run
+    public static void Run()
+    {
+        int errors = 0;
+        foreach (var name in new[] { "ImagePad/MeasureBoard", "ImagePad/LoopCounter" })
+        {
+            var s = Shader.Find(name);
+            if (s == null) { Debug.LogError($"[ImagePad] shader missing: {name}"); errors++; continue; }
+            var msgs = ShaderUtil.GetShaderMessages(s);
+            foreach (var m in msgs) Debug.Log($"[ImagePad] {name}: {m.severity} line {m.line}: {m.message}");
+            if (ShaderUtil.ShaderHasError(s)) errors++;
+            Debug.Log($"[ImagePad] {name}: hasError={ShaderUtil.ShaderHasError(s)} supported={s.isSupported}");
+        }
+        EditorApplication.Exit(errors == 0 ? 0 : 1);
+    }
+}
+
+public static class ImagePadMeasureRenderTest
+{
+    // batchmode (with graphics): -executeMethod ImagePadMeasureRenderTest.Run -imagepadOut <dir>
+    // Renders the board for known packets (and the camera loop for 10 A/B iterations) into PNGs for the decoder test.
+    static uint ExpectedByte(uint mode, uint seq, uint j)
+    {
+        unchecked
+        {
+            if (mode == 1) return (seq + j * 37u) & 255u;
+            uint h = (seq * 2654435761u) ^ (j * 2246822519u);
+            h ^= h >> 15; h *= 739982445u; h ^= h >> 12; h *= 695872825u; h ^= h >> 15;
+            return h & 255u;
+        }
+    }
+    static float[] Packet(uint seq, uint mode, uint epoch)
+    {
+        var p = new float[32];
+        p[0] = (seq >> 8) & 255; p[1] = seq & 255; p[2] = mode; p[3] = epoch;
+        for (uint j = 4; j < 32; j++) p[j] = ExpectedByte(mode, seq, j);
+        return p;
+    }
+
+    public static void Run()
+    {
+        var args = Environment.GetCommandLineArgs();
+        int oi = Array.IndexOf(args, "-imagepadOut");
+        string outDir = oi >= 0 ? args[oi + 1] : "ImagePadRenderTest";
+        System.IO.Directory.CreateDirectory(outDir);
+        try
+        {
+            var boardMat = new Material(Shader.Find("ImagePad/MeasureBoard"));
+            var loopShader = Shader.Find("ImagePad/LoopCounter");
+            var quadMesh = Resources.GetBuiltinResource<Mesh>("Quad.fbx");
+
+            // camera loop
+            RenderTexture MakeRT() { var d = new RenderTextureDescriptor(4, 4, RenderTextureFormat.ARGB32, 0) { sRGB = false }; var rt = new RenderTexture(d) { filterMode = FilterMode.Point }; rt.Create(); return rt; }
+            var rtA = MakeRT(); var rtB = MakeRT();
+            Camera MakeLoopCam(Vector3 pos, RenderTexture target, RenderTexture src, float far)
+            {
+                var go = new GameObject("loopcam") { layer = 12 };
+                go.transform.position = pos;
+                var cam = go.AddComponent<Camera>();
+                cam.orthographic = true; cam.orthographicSize = 0.01f; cam.nearClipPlane = 0.001f; cam.farClipPlane = far;
+                cam.clearFlags = CameraClearFlags.SolidColor; cam.backgroundColor = Color.clear; cam.cullingMask = 1 << 12;
+                cam.targetTexture = target; cam.allowHDR = false; cam.allowMSAA = false; cam.enabled = false;
+                var q = new GameObject("loopquad") { layer = 12 };
+                q.transform.SetParent(go.transform, false);
+                q.transform.localPosition = new Vector3(0, 0, 0.012f);
+                q.transform.localScale = Vector3.one * 0.1f;
+                q.AddComponent<MeshFilter>().sharedMesh = quadMesh;
+                var m = new Material(loopShader); m.SetTexture("_Src", src); m.SetFloat("_Far", far);
+                q.AddComponent<MeshRenderer>().sharedMaterial = m;
+                return cam;
+            }
+            var camA = MakeLoopCam(new Vector3(100, 0, 0), rtA, rtB, 0.0217f);
+            var camB = MakeLoopCam(new Vector3(100, 0, 1), rtB, rtA, 0.0219f);
+            for (int i = 0; i < 10; i++) { camA.Render(); camB.Render(); }
+
+            // board + viewer camera
+            var board = new GameObject("board");
+            board.transform.position = Vector3.zero;
+            board.AddComponent<MeshFilter>().sharedMesh = quadMesh;
+            board.AddComponent<MeshRenderer>().sharedMaterial = boardMat;
+            var vgo = new GameObject("viewer");
+            vgo.transform.position = new Vector3(0, 0, -1);
+            var view = vgo.AddComponent<Camera>();
+            view.orthographic = true; view.orthographicSize = 0.6f; view.clearFlags = CameraClearFlags.SolidColor; view.backgroundColor = Color.gray;
+            view.cullingMask = 1 << 0; view.enabled = false; view.allowMSAA = false;
+            var target = new RenderTexture(512, 512, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
+            view.targetTexture = target;
+
+            void Shot(string name, float[] p, float isLocal, float isFriend, Texture loop)
+            {
+                boardMat.SetFloat("_ByteCount", 32);
+                for (int i = 0; i < 32; i++) boardMat.SetFloat($"_P{i}", p[i]);
+                boardMat.SetFloat("_IsLocal", isLocal); boardMat.SetFloat("_IsOnFriendsList", isFriend);
+                boardMat.SetTexture("_LoopTex", loop);
+                view.Render();
+                RenderTexture.active = target;
+                var tex = new Texture2D(512, 512, TextureFormat.RGB24, false);
+                tex.ReadPixels(new Rect(0, 0, 512, 512), 0, 0);
+                tex.Apply();
+                RenderTexture.active = null;
+                System.IO.File.WriteAllBytes(System.IO.Path.Combine(outDir, name + ".png"), tex.EncodeToPNG());
+            }
+            Shot("t1_hash_seq4660_ep7_local", Packet(4660, 0, 7), 1, 0, rtA);
+            Shot("t2_sweep_seq300_ep200_friend", Packet(300, 1, 200), 0, 1, null);
+            var torn = Packet(1000, 0, 9); var other = Packet(1001, 0, 9);
+            for (int i = 16; i < 32; i++) torn[i] = other[i];
+            Shot("t3_torn_seq1000", torn, 0, 0, null);
+            Shot("t4_allzero", new float[32], 0, 0, null);
+            var inexact = Packet(77, 0, 3); inexact[10] += 0.4f;
+            Shot("t5_inexact_seq77", inexact, 0, 0, null);
+            Debug.Log("[ImagePad] render test written to " + outDir);
+            EditorApplication.Exit(0);
+        }
+        catch (Exception e) { Debug.LogException(e); EditorApplication.Exit(1); }
+    }
+}

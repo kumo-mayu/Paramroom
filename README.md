@@ -12,6 +12,6 @@ VRChat アバターの同期パラメータ（最大 256bit）だけを使って
 - `docs/design/02-transmission-schemes.md` 伝送方式の比較結果とビット予算別の推奨
 - `sim/` Node.js シミュレータ（方式実装 `codecs/`、チャネルモデル `lib/transport.js`、評価 `run.js` / `summary.js`）
   - 生の評価結果（`sim/results/*.jsonl`）は巨大なためリポジトリに含めない（`node run.js ...` で再生成）
-- `measure/` 実機測定キット（Unity 測定用プレハブ生成スクリプトとシェーダー、OSC 送信、動画解析）
+- `measure/` 実機測定キット（Unity 測定用プレハブ生成スクリプトとシェーダー、OSC 送信、動画解析）。手順は `docs/measure/procedure.md`
 
 画像の出典とライセンスは `sim/images/SOURCES.txt`。

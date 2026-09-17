@@ -8,3 +8,4 @@ sim/out/
 measure/unity/**/Library/
 measure/unity/**/Temp/
 *.tmp*
+measure/analysis/synthetic/
