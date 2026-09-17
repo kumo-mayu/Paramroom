@@ -1,0 +1,10 @@
+# dependencies / caches
+node_modules/
+sim/cache/
+# large regenerable simulation outputs (raw rows are hundreds of MB; summaries are kept)
+sim/results/*.jsonl
+sim/out/
+# unity temp
+measure/unity/**/Library/
+measure/unity/**/Temp/
+*.tmp*

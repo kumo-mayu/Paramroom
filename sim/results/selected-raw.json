@@ -1,0 +1,26 @@
+[
+ {
+  "codec": "raw",
+  "B": 256,
+  "cfg": "g32-b3-lattice",
+  "auc": 0.7337
+ },
+ {
+  "codec": "raw",
+  "B": 128,
+  "cfg": "g32-b3-lattice",
+  "auc": 0.6802
+ },
+ {
+  "codec": "raw",
+  "B": 64,
+  "cfg": "g32-b3-lattice",
+  "auc": 0.6137
+ },
+ {
+  "codec": "raw",
+  "B": 32,
+  "cfg": "g16-b3-lattice",
+  "auc": 0.554
+ }
+]
