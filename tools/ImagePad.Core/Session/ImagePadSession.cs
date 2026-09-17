@@ -39,7 +39,8 @@ public sealed class ImagePadSession : IAsyncDisposable
     }
 
     // VRChat syncs parameters about every 83-100 ms; much faster sends are dropped, much slower ones only waste time.
-    public const double MinHoldMs = 50, MaxHoldMs = 1000;
+    // up to 3 s for very congested instances (public worlds), where parameter sync can lag by seconds
+    public const double MinHoldMs = 50, MaxHoldMs = 3000;
 
     public void SetHold(double milliseconds)
     {
@@ -165,7 +166,7 @@ public sealed class ImagePadSession : IAsyncDisposable
         var spec = DecoderSpec.For(s0.Target);
         var fit = s0.Fit;
         int P = 8 * spec.Ints - WireBitsReserved;
-        var cfg = new PrimConfig { R = spec.Canvas, MaxPrims = Math.Min(spec.Capacity, options.EncodePrimsLimit ?? int.MaxValue), LayoutPrims = spec.Capacity, Cb = spec.Canvas >= 1024 ? 10 : 9 };
+        var cfg = spec.Format.Config(Math.Min(spec.Capacity, options.EncodePrimsLimit ?? int.MaxValue));
         PrimLayout layout;
         try { layout = PrimLayout.Of(cfg, P); }
         catch (InvalidOperationException) { Update(s => s with { Encode = new EncodeState.Failed($"Int {spec.Ints} 個には図形が入りません。アバターの ImagePad を作り直してください。") }); return; }

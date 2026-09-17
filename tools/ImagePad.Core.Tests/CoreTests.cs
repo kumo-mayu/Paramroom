@@ -225,3 +225,30 @@ public class HoldTests
         Assert.Equal(150, session.Snapshot.HoldMs);
     }
 }
+
+public class FormatTests
+{
+    // must match ImagePadPrimBuilder.Formats / GoodLayouts in the Unity project
+    [Theory]
+    [InlineData(4, 32, 5, 801)]
+    [InlineData(4, 26, 4, 1001)]
+    [InlineData(5, 32, 5, 1001)]
+    [InlineData(5, 27, 4, 1251)]
+    public void LightFormatsPackMorePrimitives(int formatId, int ints, int k, int units)
+    {
+        var f = DecoderFormat.Known[formatId];
+        Assert.Equal(47, f.PrimBits);
+        var L = PrimLayout.Of(f.Config(f.N), 8 * ints - 2);
+        Assert.Equal((k, units), (L.K, L.Units));
+        Assert.True(L.SpareBits >= 8);
+    }
+
+    [Fact]
+    public void SpecFollowsTheAvatarFormat()
+    {
+        var client = new VrcClient("c", "127.0.0.1", 9000, null, 26, 4, null);
+        var spec = ImagePad.Session.DecoderSpec.For(client);
+        Assert.Equal(8, spec.Format.Cb);
+        Assert.False(spec.SameLayout(ImagePad.Session.DecoderSpec.For(client with { Format = 3 })));
+    }
+}

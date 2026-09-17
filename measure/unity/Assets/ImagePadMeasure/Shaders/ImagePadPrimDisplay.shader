@@ -7,6 +7,7 @@ Shader "ImagePad/PrimDisplay"
     {
         _Atlas ("Decoder atlas", 2D) = "black" {}
         _Canvas ("Canvas texels (256 or 512)", Float) = 256
+        _StoreTexels ("Primitive store texels (decoder)", Float) = 8192
     }
     SubShader
     {
@@ -20,7 +21,7 @@ Shader "ImagePad/PrimDisplay"
             #pragma target 4.5
             #include "UnityCG.cginc"
             Texture2D<float4> _Atlas;
-            float _Canvas;
+            float _Canvas, _StoreTexels;
             struct appdata { float4 vertex : POSITION; float2 uv : TEXCOORD0; };
             struct v2f { float4 pos : SV_POSITION; float2 uv : TEXCOORD0; };
             v2f vert (appdata v)
@@ -28,7 +29,7 @@ Shader "ImagePad/PrimDisplay"
                 // un-stretch: the canvas holds the image stretched to a square; the accepted aspect code
                 // (control texel x4; 0 = 1:1) shrinks the quad's short side, the long side keeps the quad size
                 uint C = (uint)_Canvas;
-                uint ctrlY = C + 8192 / (2 * C) + 8;
+                uint ctrlY = C + ((uint)_StoreTexels + 2 * C - 1) / (2 * C) + 8;
                 uint code = (uint)round(_Atlas.Load(int3(4, ctrlY, 0)).r);
                 float aspect = code == 0 ? 1 : pow(2, (code - 1) / 254.0 * 4 - 2);
                 v.vertex.xy *= aspect >= 1 ? float2(1, 1 / aspect) : float2(aspect, 1);

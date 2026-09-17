@@ -7,12 +7,13 @@
 // Epoch 0 is ignored (transient all-zero parameters). A new non-zero epoch clears the state.
 //
 // State atlas (RGBAHalf, double buffered: this pass reads _Src = the other buffer). C = _Canvas (256 or 512):
-//   size 2C x (C + 8192/(2C) + 16): C=256 -> 512 x 288, C=512 -> 1024 x 536
+//   S = store rows = ceil(_StoreTexels / 2C) (2 texels per primitive; 8192 texels = 4096 primitives by default)
+//   size 2C x (C + S + 16): C=256 -> 512 x 288, C=512 -> 1024 x 536 (5000 primitives: 1024 x 538)
 //   work canvas     x [0,C)   y [0,C)   canvas being redrawn, _BatchSize primitives per pass
 //   display canvas  x [C,2C)  y [0,C)   last completed canvas (what the board shows)
-//   primitive store y [C, C+8192/(2C)) texel index t = 2*j + h (h = 0/1): bytes of primitive j's bit field
+//   primitive store y [C, C+S)      texel index t = 2*j + h (h = 0/1): bytes of primitive j's bit field
 //                   (4 bytes per texel, value 0..255 exact in half); present flag = byte 7 bit 0; <= 4096 primitives
-//   control         y = CTRL = C + 8192/(2C) + 8: x0 = batch counter s, x1 = epoch, x2 = bg present,
+//   control         y = CTRL = C + S + 8: x0 = batch counter s, x1 = epoch, x2 = bg present,
 //                   x3 = bg RGB 0..255, x4 = accepted aspect code, x5 = aspect code of the previous valid packet,
 //                   x6 = dirty (the store changed since the running/last redraw started)
 // Redraw on change: a redraw cycle (batches s = 0..nBatches-1) starts only when dirty is set; with nothing new the
@@ -44,6 +45,7 @@ Shader "ImagePad/PrimDecoder"
         _ABITS ("Alpha bits", Float) = 2
         _R ("Primitive coordinate range", Float) = 256
         _Canvas ("Canvas texels (256 or 512)", Float) = 256
+        _StoreTexels ("Primitive store texels (2 per primitive)", Float) = 8192
         _BatchSize ("Primitives per pass", Float) = 32
         _P0 ("P0", Float) = 0
         _P1 ("P1", Float) = 0
@@ -91,13 +93,13 @@ Shader "ImagePad/PrimDecoder"
             #include "UnityCG.cginc"
 
             Texture2D<float4> _Src;
-            float _Far, _ByteCount, _U, _K, _K0, _NPrims, _CB, _RB, _AB, _CR, _CG, _CBL, _ABITS, _R, _Canvas, _BatchSize;
+            float _Far, _ByteCount, _U, _K, _K0, _NPrims, _CB, _RB, _AB, _CR, _CG, _CBL, _ABITS, _R, _Canvas, _StoreTexels, _BatchSize;
             float _P0, _P1, _P2, _P3, _P4, _P5, _P6, _P7, _P8, _P9, _P10, _P11, _P12, _P13, _P14, _P15;
             float _P16, _P17, _P18, _P19, _P20, _P21, _P22, _P23, _P24, _P25, _P26, _P27, _P28, _P29, _P30, _P31;
 
             // atlas layout (set at the start of frag from _Canvas)
             static uint C, ATLAS_W, STORE_Y, STORE_ROWS, CTRL_Y;
-            void InitLayout() { C = (uint)_Canvas; ATLAS_W = 2 * C; STORE_Y = C; STORE_ROWS = 8192 / ATLAS_W; CTRL_Y = C + STORE_ROWS + 8; }
+            void InitLayout() { C = (uint)_Canvas; ATLAS_W = 2 * C; STORE_Y = C; STORE_ROWS = ((uint)_StoreTexels + ATLAS_W - 1) / ATLAS_W; CTRL_Y = C + STORE_ROWS + 8; }
 
             struct appdata { float4 vertex : POSITION; float2 uv : TEXCOORD0; };
             struct v2f { float4 pos : SV_POSITION; };

@@ -1,7 +1,8 @@
 // ImagePad primitive decoder prefab builder (prototype).
 //
 // Window: Tools/ImagePad/Prim Decoder Builder
-//   - pick the decoder format (256/1000, 512/2000, 512/4000) and the number of synced Int parameters D0..D(B-1)
+//   - pick the decoder format (256/1000, 512/2000, 512/4000, light 512/4000 and 512/5000) and the number of synced Int
+//     parameters D0..D(B-1)
 //   - only the "good" Int counts are offered: the smallest count for each number of primitives per packet (more Ints
 //     between two good counts would only add padding)
 //   - with an avatar selected, shows its synced bits used by everything else (NDMF ParameterInfo, the same source as the
@@ -28,48 +29,64 @@ public static class ImagePadPrimBuilder
     const string Root = "Assets/ImagePadMeasure";
     const int LoopLayer = 12;
 
-    // format id (ImagePad_Format) -> canvas, primitives requested (the layout rounds up to whole units)
-    public static readonly Dictionary<int, (int canvas, int prims, string name)> Formats = new()
+    // format id (ImagePad_Format) -> canvas, primitives requested (the layout rounds up to whole units) and the bits of
+    // each primitive field. Must match tools/ImagePad.Core DecoderFormat.Known. The light formats (47 bit, 5 primitives in
+    // 32 Int) look nearly the same as 58 bit (measure/results/2026-09-17/precision).
+    public sealed class Format
     {
-        [1] = (256, 1000, "256/1000"),
-        [2] = (512, 2000, "512/2000"),
-        [3] = (512, 4000, "512/4000"),
+        public int canvas, prims, cb, rb, ab, cr, cg, cbl, abits;
+        public string name, prefab;
+        public float far;  // unique loop camera far plane per format
+        public int PrimBits => 2 * cb + 2 * rb + ab + cr + cg + cbl + abits;
+    }
+    public static readonly Dictionary<int, Format> Formats = new()
+    {
+        [1] = new Format { canvas = 256, prims = 1000, cb = 9, rb = 8, ab = 6, cr = 5, cg = 6, cbl = 5, abits = 2, name = "256/1000", prefab = "ImagePadPrimDecoder", far = 0.0237f },
+        [2] = new Format { canvas = 512, prims = 2000, cb = 9, rb = 8, ab = 6, cr = 5, cg = 6, cbl = 5, abits = 2, name = "512/2000", prefab = "ImagePadPrimDecoder512n2000", far = 0.0257f },
+        [3] = new Format { canvas = 512, prims = 4000, cb = 9, rb = 8, ab = 6, cr = 5, cg = 6, cbl = 5, abits = 2, name = "512/4000", prefab = "ImagePadPrimDecoder512", far = 0.0247f },
+        [4] = new Format { canvas = 512, prims = 4000, cb = 8, rb = 6, ab = 5, cr = 4, cg = 4, cbl = 4, abits = 2, name = "512/4000 軽量", prefab = "ImagePadPrimDecoder512Light", far = 0.0267f },
+        [5] = new Format { canvas = 512, prims = 5000, cb = 8, rb = 6, ab = 5, cr = 4, cg = 4, cbl = 4, abits = 2, name = "512/5000 軽量", prefab = "ImagePadPrimDecoder512Light5000", far = 0.0277f },
     };
 
-    // ---- layout (same as sim/codecs/prim.js layout / tools/ImagePadTool PrimLayout; rotated ellipses e9.8.6-c565a2)
-    public const int PrimBits = 58;
+    // ---- layout (same as sim/codecs/prim.js layout / tools/ImagePad.Core PrimLayout)
     public struct Layout { public int bytes, u, k, k0, units, maxPrims, spare; }
-    public static Layout? LayoutFor(int prims, int bytes)
+    public static Layout? LayoutFor(Format f, int bytes)
     {
-        int P = 8 * bytes - 2;
+        int P = 8 * bytes - 2, primBits = f.PrimBits;
         for (int u = 1; u <= 16; u++)
         {
             int pay = P - u;
-            if (PrimBits > pay) continue;
-            int k = pay / PrimBits, k0 = Math.Max(0, (pay - 16) / PrimBits);
-            int maxPrims = k0 + (int)Math.Ceiling(Math.Max(0, prims - k0) / (double)k) * k;
+            if (primBits > pay) continue;
+            int k = pay / primBits, k0 = Math.Max(0, (pay - 16) / primBits);
+            int maxPrims = k0 + (int)Math.Ceiling(Math.Max(0, f.prims - k0) / (double)k) * k;
             int units = 1 + (maxPrims - k0) / k;
             if (units <= (1 << u))
             {
-                int spare = pay - Math.Max(16 + k0 * PrimBits, k * PrimBits);
+                int spare = pay - Math.Max(16 + k0 * primBits, k * primBits);
                 return new Layout { bytes = bytes, u = u, k = k, k0 = k0, units = units, maxPrims = maxPrims, spare = spare };
             }
         }
         return null;
     }
-    // smallest Int count for each number of primitives per packet, with a spare byte for the aspect code, <= 32 Ints,
-    // <= 4096 stored primitives
-    public static List<Layout> GoodLayouts(int prims)
+    // smallest Int count for each number of primitives per packet, with a spare byte for the aspect code, <= 32 Ints
+    public static List<Layout> GoodLayouts(Format f)
     {
         var list = new List<Layout>();
         int prevK = -1;
         for (int b = 1; b <= 32; b++)
         {
-            var l = LayoutFor(prims, b);
-            if (l is not Layout L || L.spare < 8 || L.maxPrims > 4096 || L.k == prevK) continue;
+            var l = LayoutFor(f, b);
+            if (l is not Layout L || L.spare < 8 || L.k == prevK) continue;
             list.Add(L); prevK = L.k;
         }
         return list;
+    }
+
+    // primitive store texels, whole atlas rows (2C wide), at least 8192 so the atlases of the earlier formats keep their size
+    public static int StoreTexels(Format f, Layout l)
+    {
+        int w = 2 * f.canvas;
+        return Math.Max(8192, (2 * l.maxPrims + w - 1) / w * w);
     }
 
     [MenuItem("Tools/ImagePad/Build Prim Decoder Prefab (256 bit)")]
@@ -81,20 +98,17 @@ public static class ImagePadPrimBuilder
     [MenuItem("Tools/ImagePad/Build Prim Decoder Prefab (256 bit, 512 canvas, 4000)")]
     public static void Build512() => Build(3, 32);
 
-    public static string PrefabName(int formatId, int bytes)
-    {
-        string baseName = formatId switch { 1 => "ImagePadPrimDecoder", 2 => "ImagePadPrimDecoder512n2000", _ => "ImagePadPrimDecoder512" };
-        return bytes == 32 ? baseName : $"{baseName}_{bytes}int";
-    }
+    public static string PrefabName(int formatId, int bytes) => bytes == 32 ? Formats[formatId].prefab : $"{Formats[formatId].prefab}_{bytes}int";
 
-    // formatId: 1..3 (Formats); bytes: number of synced Int parameters (should be one of GoodLayouts)
+    // formatId: Formats key; bytes: number of synced Int parameters (should be one of GoodLayouts)
     public static string Build(int formatId, int bytes)
     {
-        var (canvas, prims, _) = Formats[formatId];
-        var layout = LayoutFor(prims, bytes) ?? throw new Exception($"no layout for {prims} primitives in {bytes} Int");
+        var fmt = Formats[formatId];
+        int canvas = fmt.canvas;
+        var layout = LayoutFor(fmt, bytes) ?? throw new Exception($"no layout for {fmt.prims} primitives in {bytes} Int");
         if (layout.spare < 8) throw new Exception($"{bytes} Int: no spare byte for the aspect code");
-        // unique loop camera far planes per format (the quads only draw for their own camera)
-        float farA = formatId switch { 1 => 0.0237f, 2 => 0.0257f, _ => 0.0247f }, farB = farA + 0.0002f;
+        int storeTexels = StoreTexels(fmt, layout);
+        float farA = fmt.far, farB = farA + 0.0002f;
         string prefabName = PrefabName(formatId, bytes);
         string suffix = prefabName.Substring("ImagePadPrimDecoder".Length);
         string Gen = Root + "/GeneratedPrim" + suffix;
@@ -112,7 +126,7 @@ public static class ImagePadPrimBuilder
 
         RenderTexture Atlas(string name)
         {
-            var d = new RenderTextureDescriptor(2 * canvas, canvas + 8192 / (2 * canvas) + 16, RenderTextureFormat.ARGBHalf, 0) { sRGB = false, msaaSamples = 1, useMipMap = false, autoGenerateMips = false };
+            var d = new RenderTextureDescriptor(2 * canvas, canvas + storeTexels / (2 * canvas) + 16, RenderTextureFormat.ARGBHalf, 0) { sRGB = false, msaaSamples = 1, useMipMap = false, autoGenerateMips = false };
             return Save(new RenderTexture(d) { name = name, filterMode = FilterMode.Point, wrapMode = TextureWrapMode.Clamp }, name + ".renderTexture");
         }
         var rtA = Atlas("ImagePadPrimAtlasA" + suffix);
@@ -122,11 +136,14 @@ public static class ImagePadPrimBuilder
         var matB = Save(new Material(decShader) { name = "ImagePadPrimDecB" }, "ImagePadPrimDecB.mat");
         matB.SetTexture("_Src", rtA); matB.SetFloat("_Far", farB);
         var dispMat = Save(new Material(dispShader) { name = "ImagePadPrimDisplay" }, "ImagePadPrimDisplay.mat");
-        dispMat.SetTexture("_Atlas", rtA); dispMat.SetFloat("_Canvas", canvas);
+        dispMat.SetTexture("_Atlas", rtA); dispMat.SetFloat("_Canvas", canvas); dispMat.SetFloat("_StoreTexels", storeTexels);
         foreach (var m in new[] { matA, matB })
         {
             m.SetFloat("_Canvas", canvas); m.SetFloat("_R", canvas); m.SetFloat("_ByteCount", bytes);
             m.SetFloat("_U", layout.u); m.SetFloat("_K", layout.k); m.SetFloat("_K0", layout.k0); m.SetFloat("_NPrims", layout.maxPrims);
+            m.SetFloat("_StoreTexels", storeTexels);
+            m.SetFloat("_CB", fmt.cb); m.SetFloat("_RB", fmt.rb); m.SetFloat("_AB", fmt.ab);
+            m.SetFloat("_CR", fmt.cr); m.SetFloat("_CG", fmt.cg); m.SetFloat("_CBL", fmt.cbl); m.SetFloat("_ABITS", fmt.abits);
             EditorUtility.SetDirty(m);
         }
 
@@ -204,7 +221,7 @@ public static class ImagePadPrimBuilder
         UnityEngine.Object.DestroyImmediate(root);
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
-        Debug.Log($"[ImagePad] built {prefabPath} (format {formatId}, {bytes} Int, u={layout.u} k={layout.k} k0={layout.k0} primitives={layout.maxPrims} units={layout.units})");
+        Debug.Log($"[ImagePad] built {prefabPath} (format {formatId} {fmt.name}, {fmt.PrimBits} bit, {bytes} Int, u={layout.u} k={layout.k} k0={layout.k0} primitives={layout.maxPrims} units={layout.units} store={storeTexels})");
         return prefabPath;
     }
 
@@ -236,7 +253,7 @@ public static class ImagePadPrimBuilder
         try
         {
             foreach (var f in Formats.Keys)
-                foreach (var l in GoodLayouts(Formats[f].prims)) Build(f, l.bytes);
+                foreach (var l in GoodLayouts(Formats[f])) Build(f, l.bytes);
             EditorApplication.Exit(0);
         }
         catch (Exception e) { Debug.LogException(e); EditorApplication.Exit(1); }
@@ -260,7 +277,7 @@ public sealed class ImagePadPrimBuilderWindow : EditorWindow
         EditorGUILayout.LabelField("フォーマット（キャンバス / 図形数）", EditorStyles.boldLabel);
         var keys = ImagePadPrimBuilder.Formats.Keys.ToArray();
         int fi = Math.Max(0, Array.IndexOf(keys, formatId));
-        fi = GUILayout.Toolbar(fi, keys.Select(k => ImagePadPrimBuilder.Formats[k].name).ToArray());
+        fi = GUILayout.SelectionGrid(fi, keys.Select(k => ImagePadPrimBuilder.Formats[k].name).ToArray(), 3);
         if (keys[fi] != formatId) { formatId = keys[fi]; selected = -1; }
 
         // avatar and its free synced bits
@@ -288,7 +305,8 @@ public sealed class ImagePadPrimBuilderWindow : EditorWindow
         // good Int counts
         EditorGUILayout.Space();
         EditorGUILayout.LabelField("Int の数（図形数 / パケットが変わる数だけ）", EditorStyles.boldLabel);
-        var layouts = ImagePadPrimBuilder.GoodLayouts(ImagePadPrimBuilder.Formats[formatId].prims);
+        var layouts = ImagePadPrimBuilder.GoodLayouts(ImagePadPrimBuilder.Formats[formatId]);
+        EditorGUILayout.LabelField($"図形 1 個 {ImagePadPrimBuilder.Formats[formatId].PrimBits} bit" + (formatId >= 4 ? "（軽量：座標・色の精度を少し落とし、1 パケットに多く詰める）" : ""));
         if (selected < 0)
         {
             selected = layouts.Count - 1;

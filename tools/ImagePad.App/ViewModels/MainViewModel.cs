@@ -58,6 +58,12 @@ public sealed class MainViewModel : ViewModelBase
         new HoldOption(117, "117 ミリ秒", "少し余裕を持たせた間隔です。"),
         new HoldOption(150, "150 ミリ秒（ゆっくり）", "人が多く、同期が遅れがちなワールド向けです。"),
         new HoldOption(200, "200 ミリ秒（とてもゆっくり）", "届くのは遅くなりますが、取りこぼしはさらに起きにくくなります。"),
+        new HoldOption(250, "250 ミリ秒", "人の多いワールドで、同期が遅れているとき向けです。"),
+        new HoldOption(300, "300 ミリ秒", "人の多いワールドで、同期が遅れているとき向けです。"),
+        new HoldOption(400, "400 ミリ秒", "混雑したワールド向けです。1 周の時間は 100 ミリ秒の 4 倍かかります。"),
+        new HoldOption(500, "500 ミリ秒", "混雑したワールド向けです。1 周の時間は 100 ミリ秒の 5 倍かかります。"),
+        new HoldOption(750, "750 ミリ秒", "とても混雑したワールド向けです。"),
+        new HoldOption(1000, "1000 ミリ秒（1 秒）", "とても混雑したワールド向けです。1 周に 100 ミリ秒の 10 倍かかります。"),
     };
 
     HoldOption? selectedHold;
@@ -70,6 +76,21 @@ public sealed class MainViewModel : ViewModelBase
             Run(new UiCommand.SetHold(value.Milliseconds));
         }
     }
+
+    string holdText = "";
+    public string HoldText { get => holdText; private set => SetField(ref holdText, value); }
+
+    // 一覧に無い間隔（50〜3000 ミリ秒）。現地で試しながら決められるように、再ビルドせずに入れられる欄を置く
+    string customHoldText = "";
+    public string CustomHoldText { get => customHoldText; set => SetField(ref customHoldText, value); }
+
+    public RelayCommand ApplyCustomHoldCommand => applyCustomHold ??= new RelayCommand(() =>
+    {
+        if (double.TryParse(CustomHoldText.Trim(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var ms))
+            Run(new UiCommand.SetHold(ms));
+        else Message = "送信の間隔はミリ秒の数字で入れてください（例：350）。";
+    }, () => !string.IsNullOrWhiteSpace(CustomHoldText));
+    RelayCommand? applyCustomHold;
 
     // ---- 画像
 
@@ -258,7 +279,7 @@ public sealed class MainViewModel : ViewModelBase
                         EncodeProgress = 1;
                         double lap = img.Units.Count * s.HoldMs / 1000;
                         EncodeText = $"変換しました：図形 {img.Prims} 個、{img.Units.Count} パケット（1 周 約 {FormatDuration(TimeSpan.FromSeconds(lap))}）。" +
-                                     $"{img.Spec.Canvas}px・Int {img.Spec.Ints} 個のアバター向け{(img.Spec.Assumed ? "（アバターの種類が分からないため既定の設定）" : "")}";
+                                     $"{img.Spec.Format.Name}・Int {img.Spec.Ints} 個のアバター向け{(img.Spec.Assumed ? "（アバターの種類が分からないため既定の設定）" : "")}";
                         break;
                     case EncodeState.Failed f:
                         EncodedImage = null; EncodeProgress = 0; EncodeText = f.Message;
@@ -284,7 +305,11 @@ public sealed class MainViewModel : ViewModelBase
             }
 
             if (old?.HoldMs != s.HoldMs)
-                SelectedHold = HoldOptions.FirstOrDefault(o => o.Milliseconds == s.HoldMs) ?? new HoldOption(s.HoldMs, $"{s.HoldMs} ミリ秒", "");
+            {
+                // 一覧に無い値は選択を外す（一覧に無い項目を選ばせると、コンボボックスは前の表示のまま残る）
+                SelectedHold = HoldOptions.FirstOrDefault(o => o.Milliseconds == s.HoldMs);
+                HoldText = SelectedHold is { } h ? h.Description : $"今の間隔は {s.HoldMs} ミリ秒（入力した値）です。1 周に 100 ミリ秒の {s.HoldMs / 100:0.#} 倍かかります。";
+            }
 
             if (!ReferenceEquals(old?.Schedule, s.Schedule))
                 SelectedSchedule = ScheduleOptions.FirstOrDefault(o => o.Name == s.Schedule) ?? new ScheduleOption(s.Schedule, s.Schedule, "");
@@ -331,7 +356,7 @@ public sealed class MainViewModel : ViewModelBase
         string where = $"VRChat（ポート {c.OscPort}）";
         if (!ImagePadSession.IsUsable(c)) return $"{where}：ImagePad なし";
         var spec = DecoderSpec.For(c);
-        return $"{where}：{spec.Canvas}px・図形 {spec.Capacity} 個・Int {spec.Ints} 個{(spec.Assumed ? "（種類不明）" : "")}";
+        return $"{where}：{spec.Format.Name}・Int {spec.Ints} 個{(spec.Assumed ? "（種類不明）" : "")}";
     }
 
     static string TargetDetail(VrcClient c)
@@ -339,7 +364,7 @@ public sealed class MainViewModel : ViewModelBase
         var spec = DecoderSpec.For(c);
         return spec.Assumed
             ? $"送信先：VRChat（ポート {c.OscPort}）。アバターの種類が読めないため、512px・図形 4000 個・Int {spec.Ints} 個として送ります。"
-            : $"送信先：VRChat（ポート {c.OscPort}）。アバターは {spec.Canvas}px・図形 {spec.Capacity} 個・Int {spec.Ints} 個に対応しています。";
+            : $"送信先：VRChat（ポート {c.OscPort}）。アバターは {spec.Format.Name}・Int {spec.Ints} 個に対応しています。";
     }
 
     static string FormatDuration(TimeSpan t) => t.TotalMinutes >= 1 ? $"{(int)t.TotalMinutes} 分 {t.Seconds} 秒" : $"{t.Seconds} 秒";

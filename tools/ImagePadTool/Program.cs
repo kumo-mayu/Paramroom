@@ -59,7 +59,7 @@ if (cmd == "send")
     }
 }
 if (Opt("format") is string fo) format = int.Parse(fo);
-(int R, int N, string Prefab)? avatarFormat = null;
+DecoderFormatInfo? avatarFormat = null;
 if (format is int f)
 {
     if (!DecoderFormat.Known.TryGetValue(f, out var kf)) { Console.WriteLine($"unknown ImagePad_Format {f}"); return 2; }
@@ -70,9 +70,10 @@ int nBytes = avatarBytes ?? (int)Num("bytes", 32);
 if (avatarBytes is int ab && Opt("bytes") is string ob && int.Parse(ob) != ab) { Console.WriteLine($"--bytes {ob} ignored: the avatar has {ab} Int parameters"); }
 if (nBytes < 1 || nBytes > 32) { Console.WriteLine($"unsupported Int parameter count {nBytes}"); return 2; }
 // r / capacity / bytes of the data vs the avatar's decoder
-bool CheckMatch(int r, int capacity, int bytes)
+// fieldBits: the data's primitive bit count (null = the avatar format's own); a light-format avatar reads other widths
+bool CheckMatch(int r, int capacity, int bytes, int? fieldBits = null)
 {
-    bool ok = avatarFormat is not { } af || (af.R == r && af.N == capacity);
+    bool ok = avatarFormat is not { } af || (af.R == r && af.N == capacity && (fieldBits is null || fieldBits == af.PrimBits));
     ok &= avatarBytes is not int abm || abm == bytes;
     if (ok) return true;
     Console.WriteLine($"the avatar's decoder is {(avatarFormat is { } a2 ? $"{a2.R}/{a2.N}" : "?")} with {(avatarBytes?.ToString() ?? "?")} Int, the data is {r}/{capacity} with {bytes} Int{(Flag("force") ? " (--force: sending anyway)" : "; use matching options or --force")}");
@@ -93,7 +94,8 @@ if (Opt("units") is string unitsFile)
     units = root.GetProperty("units").EnumerateArray().Select(e => e.GetString()!.Select(c => c == '1').ToArray()).ToList();
     gains = root.GetProperty("gains").EnumerateArray().Select(e => e.ValueKind == JsonValueKind.Number ? e.GetDouble() : double.PositiveInfinity).ToArray();
     Console.WriteLine($"loaded {units.Count} units (R {r}, n {n} of capacity {cap}, {fileBytes} Int, aspect {aspect}) from {unitsFile}");
-    if (!CheckMatch(r, cap, fileBytes)) return 3;
+    int? bitsOfFile = root.TryGetProperty("cb", out var jcb) ? 2 * jcb.GetInt32() + 2 * root.GetProperty("rb").GetInt32() + root.GetProperty("ab").GetInt32() + root.GetProperty("col").EnumerateArray().Sum(e => e.GetInt32()) + root.GetProperty("aBits").GetInt32() : 58;
+    if (!CheckMatch(r, cap, fileBytes, bitsOfFile)) return 3;
     nBytes = fileBytes; P = 8 * nBytes - 2;
 }
 else
@@ -109,7 +111,7 @@ else
     aspect = fit == "crop" ? Aspect.Code(1, 1) : Aspect.Code(img.W, img.H);
     if (fit == "crop") { int s = Math.Min(img.W, img.H); img = img.Crop((img.W - s) >> 1, (img.H - s) >> 1, s, s); }
     img = img.Resize(R, R);
-    var cfg = new PrimConfig { R = R, MaxPrims = n, LayoutPrims = capacity, Cb = R >= 1024 ? 10 : 9 };
+    var cfg = avatarFormat is { } fmt && fmt.R == R ? fmt.Config(n) : new PrimConfig { R = R, MaxPrims = n, LayoutPrims = capacity, Cb = R >= 1024 ? 10 : 9 };
     // precision experiments (bits per field); the avatar decoder must be built with the same widths
     if (Opt("cb") is string ocb) cfg.Cb = int.Parse(ocb);
     if (Opt("rb") is string orb) cfg.Rb = int.Parse(orb);

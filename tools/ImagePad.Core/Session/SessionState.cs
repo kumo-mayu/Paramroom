@@ -17,19 +17,22 @@ public sealed record SourceInfo(string Name, int Width, int Height, Preview Prev
 
 // What the avatar's decoder expects. Assumed = the avatar did not tell (no target yet, or a prefab without
 // ImagePad_Format), the defaults 512/4000 are used.
-public sealed record DecoderSpec(int Canvas, int Capacity, int Ints, int? FormatId, bool Assumed)
+public sealed record DecoderSpec(DecoderFormatInfo Format, int Ints, int? FormatId, bool Assumed)
 {
-    public static DecoderSpec Default { get; } = new(512, 4000, 32, null, true);
+    public static DecoderSpec Default { get; } = new(DecoderFormat.Default, 32, null, true);
+
+    public int Canvas => Format.R;
+    public int Capacity => Format.N;
 
     public static DecoderSpec For(VrcClient? target)
     {
         if (target is null || target.ImagePadParams <= 0) return Default;
         if (target.Format is int f && DecoderFormat.Known.TryGetValue(f, out var known))
-            return new DecoderSpec(known.R, known.N, target.ImagePadParams, f, false);
+            return new DecoderSpec(known, target.ImagePadParams, f, false);
         return Default with { Ints = target.ImagePadParams };
     }
 
-    public bool SameLayout(DecoderSpec other) => Canvas == other.Canvas && Capacity == other.Capacity && Ints == other.Ints;
+    public bool SameLayout(DecoderSpec other) => Format.SameFields(other.Format) && Ints == other.Ints;
 }
 
 public abstract record EncodeState

@@ -12,14 +12,34 @@ public sealed record VrcClient(string Name, string OscIp, int OscPort, string? A
 }
 
 // ImagePad_Format (local-only avatar parameter set by the prefab) -> decoder variant
+// Field widths: centre / radius / angle / colour RGB / alpha bits of one primitive. The light variant (formats 4-5,
+// 47 bit) packs 5 primitives into 32 Int instead of 4 with nearly the same picture
+// (measure/results/2026-09-17/precision: 16 images, 0.972-0.976 vs 0.977, joiners at 20 s 0.797 vs 0.771).
+// Must match the Unity prefab builder (ImagePadPrimBuilder.Formats).
+public sealed record DecoderFormatInfo(int R, int N, int Cb, int Rb, int Ab, int[] Col, int ABits, string Prefab, string Name)
+{
+    public int PrimBits => 2 * Cb + 2 * Rb + Ab + Col.Sum() + ABits;
+
+    public PrimConfig Config(int maxPrims) => new() { R = R, MaxPrims = maxPrims, LayoutPrims = N, Cb = Cb, Rb = Rb, Ab = Ab, Col = Col, ABits = ABits };
+
+    public bool SameFields(DecoderFormatInfo o) => R == o.R && N == o.N && Cb == o.Cb && Rb == o.Rb && Ab == o.Ab && ABits == o.ABits && Col.SequenceEqual(o.Col);
+}
+
 public static class DecoderFormat
 {
-    public static readonly Dictionary<int, (int R, int N, string Prefab)> Known = new()
+    static readonly int[] C565 = { 5, 6, 5 }, C444 = { 4, 4, 4 };
+
+    public static readonly Dictionary<int, DecoderFormatInfo> Known = new()
     {
-        [1] = (256, 1000, "ImagePadPrimDecoder"),
-        [2] = (512, 2000, "ImagePadPrimDecoder512n2000"),
-        [3] = (512, 4000, "ImagePadPrimDecoder512"),
+        [1] = new(256, 1000, 9, 8, 6, C565, 2, "ImagePadPrimDecoder", "256px・図形 1000 個"),
+        [2] = new(512, 2000, 9, 8, 6, C565, 2, "ImagePadPrimDecoder512n2000", "512px・図形 2000 個"),
+        [3] = new(512, 4000, 9, 8, 6, C565, 2, "ImagePadPrimDecoder512", "512px・図形 4000 個"),
+        [4] = new(512, 4000, 8, 6, 5, C444, 2, "ImagePadPrimDecoder512Light", "512px・図形 4000 個（軽量）"),
+        [5] = new(512, 5000, 8, 6, 5, C444, 2, "ImagePadPrimDecoder512Light5000", "512px・図形 5000 個（軽量）"),
     };
+
+    // what is assumed when the avatar does not tell (prefabs before ImagePad_Format)
+    public static DecoderFormatInfo Default => Known[3];
 }
 
 public static class VrcDiscovery

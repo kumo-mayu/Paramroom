@@ -33,7 +33,13 @@ public static class ImagePadPrimTest
             int U = Num("u", layout), K = Num("k", layout), K0 = Num("k0", layout), NPrims = Num("maxPrims", layout);
             int R = Num("R", json.Substring(json.IndexOf("\"cfg\"")));
             int C = R; // canvas texels = coordinate range (256 or 512)
-            int W = 2 * C, H = C + 8192 / W + 16, ctrlY = C + 8192 / W + 8;
+            // store size as ImagePadPrimBuilder.StoreTexels (whole rows, at least 8192 texels)
+            int storeTexels = Math.Max(8192, (2 * NPrims + 2 * C - 1) / (2 * C) * (2 * C));
+            int W = 2 * C, H = C + storeTexels / W + 16, ctrlY = C + storeTexels / W + 8;
+            // field widths (light formats); older test data has none and uses the shader defaults e9.8.6-c565a2
+            string cfgJson = json.Substring(json.IndexOf("\"cfg\""));
+            int Opt(string key, int d) { var mm = Regex.Match(cfgJson, $"\"{key}\":([0-9]+)"); return mm.Success ? int.Parse(mm.Groups[1].Value) : d; }
+            var colM = Regex.Match(cfgJson, "\"col\":\\[([0-9]+),([0-9]+),([0-9]+)\\]");
             int pi = json.IndexOf("\"packets\"");
             var nums = Regex.Matches(json.Substring(pi), "[0-9]+").Cast<Match>().Select(m => int.Parse(m.Value)).ToList();
             var nbMatch = Regex.Match(json, "\"bytes\":([0-9]+)");
@@ -50,7 +56,9 @@ public static class ImagePadPrimTest
             foreach (var m in new[] { matA, matB })
             {
                 m.SetFloat("_U", U); m.SetFloat("_K", K); m.SetFloat("_K0", K0); m.SetFloat("_NPrims", NPrims);
-                m.SetFloat("_R", R); m.SetFloat("_Canvas", C); m.SetFloat("_ByteCount", NB);
+                m.SetFloat("_R", R); m.SetFloat("_Canvas", C); m.SetFloat("_ByteCount", NB); m.SetFloat("_StoreTexels", storeTexels);
+                m.SetFloat("_CB", Opt("cb", 9)); m.SetFloat("_RB", Opt("rb", 8)); m.SetFloat("_AB", Opt("ab", 6)); m.SetFloat("_ABITS", Opt("aBits", 2));
+                if (colM.Success) { m.SetFloat("_CR", int.Parse(colM.Groups[1].Value)); m.SetFloat("_CG", int.Parse(colM.Groups[2].Value)); m.SetFloat("_CBL", int.Parse(colM.Groups[3].Value)); }
             }
             Camera MakeCam(Vector3 pos, RenderTexture target, Material mat, RenderTexture src, float far)
             {
@@ -151,7 +159,7 @@ public static class ImagePadPrimTest
             // display quad (PrimDisplay shader) seen by an orthographic camera: checks the aspect reshaping
             var dispShader = Shader.Find("ImagePad/PrimDisplay");
             if (dispShader == null) throw new Exception("PrimDisplay shader missing");
-            var dispMat = new Material(dispShader); dispMat.SetTexture("_Atlas", rtA); dispMat.SetFloat("_Canvas", C);
+            var dispMat = new Material(dispShader); dispMat.SetTexture("_Atlas", rtA); dispMat.SetFloat("_Canvas", C); dispMat.SetFloat("_StoreTexels", storeTexels);
             var dq = new GameObject("dispquad") { layer = 13 };
             dq.transform.position = new Vector3(-200, 0, 1);
             dq.AddComponent<MeshFilter>().sharedMesh = quadMesh;
