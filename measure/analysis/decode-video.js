@@ -32,7 +32,7 @@ proc.stdout.on('data', chunk => {
     const f = buf.subarray(0, frameSize);
     if (frame % redetect === 0 || boards.length === 0) boards = B.detectBoards(f, W, H);
     boards.forEach((b, i) => {
-      const d = B.decodeBoard(f, W, b);
+      const d = B.decodeBoard(f, W, b, H);
       csv.write(`${frame},${(frame * 1000 / fps).toFixed(2)},${i},${b.x},${b.y},${b.w},${b.h},${d.seq},${d.mode},${d.epoch},${d.consistent},${d.exact},${d.isLocal},${d.isFriend},${d.allZero},${d.mismatches},${d.loop},${d.valid ? 1 : 0}\n`);
     });
     buf = buf.subarray(frameSize);

@@ -145,13 +145,22 @@ public static class ImagePadMeasureBuilder
             children.Add(new ChildMotion { motion = ConstantClip($"ImagePad_Set_P{i}", "Board", typeof(MeshRenderer), $"material._P{i}", 1), directBlendParameter = $"D{i}", timeScale = 1 });
         children.Add(new ChildMotion { motion = ConstantClip("ImagePad_Set_IsLocal", "Board", typeof(MeshRenderer), "material._IsLocal", 1), directBlendParameter = "IsLocal", timeScale = 1 });
         children.Add(new ChildMotion { motion = ConstantClip("ImagePad_Set_IsOnFriendsList", "Board", typeof(MeshRenderer), "material._IsOnFriendsList", 1), directBlendParameter = "IsOnFriendsList", timeScale = 1 });
-        if (withLoop)
+        // Base child, always weight 1 (ImagePad_One): writes 0 to every data property (and enables the loop cameras).
+        // Without it, a Direct blend tree child whose weight parameter is 0 is skipped and the material property
+        // keeps its previous value instead of becoming 0 (observed in VRChat 2026-09-17: zero bytes stayed stale).
+        // With the base child the property is always written: value = 1 * 0 + D_i * 1 = D_i.
         {
-            var camClip = new AnimationClip { name = "ImagePad_LoopOn" };
-            foreach (var cam in new[] { "Loop/CamA", "Loop/CamB" })
-                AnimationUtility.SetEditorCurve(camClip, EditorCurveBinding.FloatCurve(cam, typeof(Camera), "m_Enabled"), new AnimationCurve(new Keyframe(0, 1), new Keyframe(1f / 60f, 1)));
-            CreateOrReplace(camClip, $"{Gen}/ImagePad_LoopOn.anim");
-            children.Add(new ChildMotion { motion = camClip, directBlendParameter = "ImagePad_One", timeScale = 1 });
+            var baseClip = new AnimationClip { name = "ImagePad_Base" };
+            var zero = new AnimationCurve(new Keyframe(0, 0), new Keyframe(1f / 60f, 0));
+            for (int i = 0; i < byteCount; i++)
+                AnimationUtility.SetEditorCurve(baseClip, EditorCurveBinding.FloatCurve("Board", typeof(MeshRenderer), $"material._P{i}"), zero);
+            AnimationUtility.SetEditorCurve(baseClip, EditorCurveBinding.FloatCurve("Board", typeof(MeshRenderer), "material._IsLocal"), zero);
+            AnimationUtility.SetEditorCurve(baseClip, EditorCurveBinding.FloatCurve("Board", typeof(MeshRenderer), "material._IsOnFriendsList"), zero);
+            if (withLoop)
+                foreach (var cam in new[] { "Loop/CamA", "Loop/CamB" })
+                    AnimationUtility.SetEditorCurve(baseClip, EditorCurveBinding.FloatCurve(cam, typeof(Camera), "m_Enabled"), new AnimationCurve(new Keyframe(0, 1), new Keyframe(1f / 60f, 1)));
+            CreateOrReplace(baseClip, $"{Gen}/ImagePad_Base.anim");
+            children.Add(new ChildMotion { motion = baseClip, directBlendParameter = "ImagePad_One", timeScale = 1 });
         }
 
         // Controller
@@ -366,5 +375,65 @@ public static class ImagePadMeasureRenderTest
             EditorApplication.Exit(0);
         }
         catch (Exception e) { Debug.LogException(e); EditorApplication.Exit(1); }
+    }
+}
+
+public static class ImagePadMeasureAnimatorTest
+{
+    // batchmode: -executeMethod ImagePadMeasureAnimatorTest.Run
+    // Drives the generated FX controller with a plain Animator (no VRChat/MA) and reads the material properties
+    // back from the renderer's property block, for packets containing zero bytes. Also runs the same test with the
+    // base child removed to reproduce the "zero byte keeps previous value" behaviour.
+    public static void Run()
+    {
+        int failures = 0;
+        try
+        {
+            ImagePadMeasureBuilder.Build(32, true);
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/ImagePadMeasure/ImagePadMeasure.prefab");
+            var ctrl = AssetDatabase.LoadAssetAtPath<AnimatorController>("Assets/ImagePadMeasure/Generated/ImagePadMeasure_FX.controller");
+            failures += RunCase("with base child", prefab, ctrl, expectStale: false);
+
+            // variant without the base child
+            var copyPath = "Assets/ImagePadMeasure/Generated/ImagePadMeasure_FX_nobase.controller";
+            AssetDatabase.CopyAsset("Assets/ImagePadMeasure/Generated/ImagePadMeasure_FX.controller", copyPath);
+            var noBase = AssetDatabase.LoadAssetAtPath<AnimatorController>(copyPath);
+            var tree = (BlendTree)noBase.layers[0].stateMachine.defaultState.motion;
+            tree.children = tree.children.Where(c => c.directBlendParameter != "ImagePad_One").ToArray();
+            // NOTE: plain Unity did not reproduce the stale-zero behaviour seen in VRChat (2026-09-17); this case is
+            // informational only. The base child makes the property written every frame regardless of the cause.
+            RunCase("without base child (old, informational)", prefab, noBase, expectStale: false);
+        }
+        catch (Exception e) { Debug.LogException(e); failures++; }
+        Debug.Log($"[ImagePad] animator test failures={failures}");
+        EditorApplication.Exit(failures == 0 ? 0 : 1);
+    }
+
+    static int RunCase(string label, GameObject prefab, RuntimeAnimatorController ctrl, bool expectStale)
+    {
+        var go = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
+        var anim = go.AddComponent<Animator>();
+        anim.runtimeAnimatorController = ctrl;
+        anim.cullingMode = AnimatorCullingMode.AlwaysAnimate;
+        anim.Rebind();
+        var renderer = go.transform.Find("Board").GetComponent<MeshRenderer>();
+        var mpb = new MaterialPropertyBlock();
+        float Read(int i) { renderer.GetPropertyBlock(mpb); return mpb.GetFloat($"_P{i}"); }
+        void Set(int i, float v) => anim.SetFloat($"D{i}", v);
+
+        int bad = 0;
+        foreach (var (step, v0, v5) in new[] { (1, 18f, 255f), (2, 0f, 7f), (3, 200f, 0f), (4, 0f, 0f) })
+        {
+            Set(0, v0); Set(5, v5);
+            anim.Update(1f / 60f); anim.Update(1f / 60f);
+            float r0 = Read(0), r5 = Read(5);
+            bool ok = Mathf.Abs(r0 - v0) < 1e-4f && Mathf.Abs(r5 - v5) < 1e-4f;
+            Debug.Log($"[ImagePad] {label} step {step}: set D0={v0} D5={v5} -> _P0={r0} _P5={r5} {(ok ? "OK" : "MISMATCH")}");
+            if (!ok) bad++;
+        }
+        UnityEngine.Object.DestroyImmediate(go);
+        bool pass = expectStale ? bad > 0 : bad == 0;
+        Debug.Log($"[ImagePad] {label}: {(pass ? "PASS" : "FAIL")} (mismatching steps {bad}, expectStale={expectStale})");
+        return pass ? 0 : 1;
     }
 }
