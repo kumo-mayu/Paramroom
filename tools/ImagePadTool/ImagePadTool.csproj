@@ -5,17 +5,13 @@
     <TargetFramework>net9.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <InvariantGlobalization>true</InvariantGlobalization>
     <TieredPGO>true</TieredPGO>
-    <ServerGarbageCollector>false</ServerGarbageCollector>
     <AssemblyName>imagepad</AssemblyName>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="StbImageSharp" Version="2.30.16" />
-    <PackageReference Include="StbImageWriteSharp" Version="1.16.7" />
-    <PackageReference Include="VRChat.OSCQuery" Version="0.0.7" />
+    <ProjectReference Include="..\ImagePad.Core\ImagePad.Core.csproj" />
   </ItemGroup>
 
 </Project>

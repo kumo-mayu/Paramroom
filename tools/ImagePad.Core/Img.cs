@@ -14,13 +14,39 @@ public sealed class Img
     public static Img Load(string path)
     {
         using var s = File.OpenRead(path);
+        return Load(s);
+    }
+
+    public static Img Load(Stream s)
+    {
         var r = ImageResult.FromStream(s, ColorComponents.RedGreenBlueAlpha);
-        var img = new Img(r.Width, r.Height);
-        for (int i = 0, j = 0; i < r.Width * r.Height; i++, j += 4)
+        return FromRgba(r.Data, r.Width, r.Height);
+    }
+
+    // 8-bit RGBA rows top-down, alpha composited on white
+    public static Img FromRgba(byte[] rgba, int w, int h)
+    {
+        var img = new Img(w, h);
+        for (int i = 0, j = 0; i < w * h; i++, j += 4)
         {
-            double a = r.Data[j + 3] / 255.0;
-            for (int k = 0; k < 3; k++) img.Data[i * 3 + k] = r.Data[j + k] * a + 255 * (1 - a);
+            double a = rgba[j + 3] / 255.0;
+            for (int k = 0; k < 3; k++) img.Data[i * 3 + k] = rgba[j + k] * a + 255 * (1 - a);
         }
+        return img;
+    }
+
+    // RGB bytes (rounded) for previews
+    public byte[] ToRgbBytes()
+    {
+        var b = new byte[Data.Length];
+        for (int i = 0; i < b.Length; i++) b[i] = (byte)Math.Max(0, Math.Min(255, Math.Floor(Data[i] + 0.5)));
+        return b;
+    }
+
+    public static Img FromRgbBytes(byte[] rgb, int w, int h)
+    {
+        var img = new Img(w, h);
+        for (int i = 0; i < rgb.Length; i++) img.Data[i] = rgb[i];
         return img;
     }
 

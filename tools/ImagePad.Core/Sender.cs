@@ -150,3 +150,14 @@ public static class FirstPass
         };
     }
 }
+
+// Windows sleeps in ~15.6 ms steps unless the timer resolution is raised; a 100 ms packet interval needs ~1 ms.
+public sealed class TimerResolution : IDisposable
+{
+    [DllImport("winmm.dll")] static extern uint timeBeginPeriod(uint p);
+    [DllImport("winmm.dll")] static extern uint timeEndPeriod(uint p);
+    readonly bool active;
+    TimerResolution() { if (OperatingSystem.IsWindows()) { timeBeginPeriod(1); active = true; } }
+    public static TimerResolution Begin() => new();
+    public void Dispose() { if (active) timeEndPeriod(1); }
+}

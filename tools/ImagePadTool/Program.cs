@@ -150,21 +150,7 @@ if (cmd == "send")
     // order, repeated. sim/results/fastfirst.md: fast is worse for viewers joining during the first pass (N x 100 ms).
     // also the first-pass variants of sim/lib/schedules-ff.js: fast+sqrt/k, fast+sqrtB/k, fast+baseB/k
     string sched = Opt("schedule") ?? "fast+sqrt/8"; // default chosen from measure/results/2026-09-17/fastfirst (2026-09-17)
-    Func<int, int> schedule;
-    var m = System.Text.RegularExpressions.Regex.Match(sched, @"^fast\+(sqrt|base)(\d*)/(\d+)$");
-    if (sched == "sqrt") { var s = new SqrtSchedule(gains); schedule = k => s[k]; }
-    else if (sched == "fast") { var s = new SqrtSchedule(gains); schedule = k => k < N ? k : s[k - N]; }
-    else if (m.Success)
-    {
-        int b = m.Groups[2].Value == "" ? N : Math.Min(N, int.Parse(m.Groups[2].Value)), kk = int.Parse(m.Groups[3].Value);
-        Func<int, int> filler;
-        if (m.Groups[1].Value == "base") filler = i => i % b;
-        else { var sf = new SqrtSchedule(gains.Take(b).ToArray()); filler = i => sf[i]; }
-        var sq = new SqrtSchedule(gains);
-        schedule = FirstPass.With(N, kk, filler, k => sq[k]);
-    }
-    else if (sched == "carousel") schedule = k => k % N;
-    else { Console.WriteLine($"unknown schedule {sched}"); return 2; }
+    if (Schedules.Create(sched, gains) is not { } schedule) { Console.WriteLine($"unknown schedule {sched}"); return 2; }
     Console.WriteLine($"aspect code {aspect} (w/h {Aspect.Ratio(aspect):F3}); sending {packets.Length} units x {nBytes} Int to {host}:{port}: epoch {epoch}, schedule {sched}, hold {hold} ms, {(bundle ? "OSC bundle" : "single messages")}. Ctrl+C to stop.");
     OscSender.Run(packets, schedule, host, port, hold, duration, bundle);
 }
