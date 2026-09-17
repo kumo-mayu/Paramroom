@@ -83,10 +83,26 @@
                             </TextBox>
                             <Button Grid.Column="1" Content="URL から読み込む" Command="{Binding LoadUrlCommand}" Margin="6,0,0,0" />
                         </Grid>
-                        <TextBlock Style="{StaticResource Note}" Text="ファイルのドラッグや、画像・URL の貼り付け（Ctrl+V）でも指定できます。" />
+                        <TextBlock Style="{StaticResource Note}" Text="ファイルやブラウザの画像のドラッグ、画像・URL の貼り付け（Ctrl+V）でも指定できます。" />
+                        <Grid Margin="0,8,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <ComboBox Grid.Column="0" ItemsSource="{Binding History}" SelectedItem="{Binding SelectedHistory}" DisplayMemberPath="Label"
+                                      AutomationProperties.Name="最近使った画像" ToolTip="{Binding SelectedHistory.Entry.Value}" />
+                            <Button Grid.Column="1" Content="もう一度読み込む" Command="{Binding LoadHistoryCommand}" Margin="6,0,0,0" />
+                            <Button Grid.Column="2" Content="履歴を消す" Command="{Binding ClearHistoryCommand}" Margin="6,0,0,0" />
+                        </Grid>
                     </StackPanel>
                     <StackPanel DockPanel.Dock="Bottom" Margin="0,10,0,0">
                         <TextBlock Text="{Binding SourceText}" TextWrapping="Wrap" />
+                        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                            <TextBlock Text="図形の数" VerticalAlignment="Center" Margin="0,0,8,0" />
+                            <ComboBox Width="220" ItemsSource="{Binding PrimCountOptions}" SelectedItem="{Binding SelectedPrimCount}" AutomationProperties.Name="図形の数" />
+                        </StackPanel>
+                        <TextBlock Style="{StaticResource Note}" Text="図形を減らすと 1 周が短くなりますが、細かいところが粗くなります。" />
                         <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
                             <RadioButton Content="画像全体を送る" IsChecked="{Binding FitStretch}" GroupName="fit" Margin="0,0,16,0" />
                             <RadioButton Content="中央を正方形に切り抜く" IsChecked="{Binding FitCrop}" GroupName="fit" />

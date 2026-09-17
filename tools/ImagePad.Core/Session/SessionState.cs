@@ -45,7 +45,7 @@ public abstract record EncodeState
 }
 
 public sealed record EncodedImage(
-    DecoderSpec Spec, FitMode Fit, int Aspect, PrimConfig Config, PrimLayout Layout,
+    DecoderSpec Spec, FitMode Fit, int? RequestedPrims, int Aspect, PrimConfig Config, PrimLayout Layout,
     IReadOnlyList<bool[]> Units, double[] Gains, int Prims, double Seconds, Preview Preview);
 
 public sealed record SendProgress(
@@ -65,6 +65,8 @@ public abstract record SendState
 public sealed record SessionSnapshot(
     SourceInfo? Source,
     FitMode Fit,
+    // primitives to encode; null = as many as the avatar's decoder holds. Fewer primitives = fewer packets = shorter lap
+    int? PrimCount,
     EncodeState Encode,
     bool SearchingTargets,
     IReadOnlyList<VrcClient> Targets,
@@ -72,8 +74,10 @@ public sealed record SessionSnapshot(
     string Schedule,
     // milliseconds each packet is held before the next one is sent
     double HoldMs,
-    SendState Send)
+    SendState Send,
+    // recently loaded files and URLs, newest first
+    IReadOnlyList<HistoryEntry> History)
 {
     public static SessionSnapshot Initial { get; } = new(
-        null, FitMode.Stretch, new EncodeState.Idle(), false, Array.Empty<VrcClient>(), null, Schedules.Default, 100, new SendState.Idle());
+        null, FitMode.Stretch, null, new EncodeState.Idle(), false, Array.Empty<VrcClient>(), null, Schedules.Default, 100, new SendState.Idle(), Array.Empty<HistoryEntry>());
 }

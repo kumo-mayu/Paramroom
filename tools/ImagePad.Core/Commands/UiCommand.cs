@@ -16,7 +16,15 @@ public abstract record UiCommand
     // already decoded pixels (e.g. pasted from the clipboard)
     public sealed record LoadImagePixels(Img Image, string Name) : UiCommand;
 
+    // encoded image bytes (e.g. a data: URI dropped from a browser)
+    public sealed record LoadImageData(byte[] Bytes, string Name) : UiCommand;
+
+    public sealed record ClearHistory() : UiCommand;
+
     public sealed record SetFit(FitMode Fit) : UiCommand;
+
+    // null = the avatar decoder's capacity
+    public sealed record SetPrimCount(int? Count) : UiCommand;
 
     public sealed record RefreshTargets() : UiCommand;
 

@@ -252,3 +252,86 @@ public class FormatTests
         Assert.False(spec.SameLayout(ImagePad.Session.DecoderSpec.For(client with { Format = 3 })));
     }
 }
+
+public class PrimCountTests
+{
+    sealed class OneClient : ITargetFinder
+    {
+        public Task<IReadOnlyList<VrcClient>> FindAsync(CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<VrcClient>>(new[] { new VrcClient("c", "127.0.0.1", 9000, null, 32, 3, null) });
+    }
+
+    [Fact]
+    public async Task FewerPrimitivesMeanFewerUnitsWithTheSameLayout()
+    {
+        await using var session = new ImagePadSession(new OneClient(), _ => throw new InvalidOperationException(), new StbImageDecoder(), new HttpImageFetcher());
+        var handler = new CommandHandler(session);
+        await handler.ExecuteAsync(new UiCommand.RefreshTargets());
+        Assert.IsType<CommandResult.Failed>(await handler.ExecuteAsync(new UiCommand.SetPrimCount(10)));
+        Assert.IsType<CommandResult.Done>(await handler.ExecuteAsync(new UiCommand.SetPrimCount(200)));
+        var image = new Img(256, 256);
+        for (int i = 0; i < image.Data.Length; i++) image.Data[i] = (i * 37) % 251;
+        await handler.ExecuteAsync(new UiCommand.LoadImagePixels(image, "t"));
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        while (session.Snapshot.Encode is not EncodeState.Ready && sw.ElapsedMilliseconds < 20000) await Task.Delay(10);
+        var ready = Assert.IsType<EncodeState.Ready>(session.Snapshot.Encode);
+        Assert.Equal(200, ready.Image.RequestedPrims);
+        Assert.True(ready.Image.Units.Count <= 1 + (200 - 3 + 3) / 4, $"{ready.Image.Units.Count} units");
+        Assert.Equal(10, ready.Image.Layout.U); // still the 4000-primitive decoder's unit ids
+    }
+}
+
+public class DropAndHistoryTests
+{
+    [Fact]
+    public void ImageUrlComesFromTheImgTagNotTheLinkAround()
+    {
+        // what Chromium puts as "HTML Format" when a linked picture is dragged (header trimmed)
+        const string html = "<html><body><!--StartFragment--><a href=\"https://example.com/page\"><img src=\"https://cdn.example.com/a/b.png?x=1&amp;y=2\" alt=\"x\"></a><!--EndFragment--></body></html>";
+        Assert.Equal("https://cdn.example.com/a/b.png?x=1&y=2", DropParsing.ImageUrlFromHtml(html));
+        Assert.Null(DropParsing.ImageUrlFromHtml("<p>no picture</p>"));
+        Assert.Null(DropParsing.ImageUrlFromHtml("<img src=\"/relative.png\">"));
+    }
+
+    [Fact]
+    public void UrlTextAndDataUris()
+    {
+        Assert.Equal("https://example.com/i.jpg", DropParsing.UrlFromText("https://example.com/i.jpg\nTitle"));
+        Assert.Null(DropParsing.UrlFromText("hello"));
+        Assert.Equal(new byte[] { 1, 2, 3 }, DropParsing.BytesFromDataUri("data:image/png;base64,AQID"));
+        Assert.Null(DropParsing.BytesFromDataUri("data:image/svg+xml,<svg/>"));
+    }
+
+    [Fact]
+    public void HistoryKeepsTenNewestWithoutDuplicates()
+    {
+        IReadOnlyList<HistoryEntry> h = Array.Empty<HistoryEntry>();
+        for (int i = 0; i < 12; i++) h = HistoryRules.Add(h, new HistoryEntry(SourceKind.Url, $"https://e/{i}.png", $"{i}.png", DateTimeOffset.Now));
+        h = HistoryRules.Add(h, new HistoryEntry(SourceKind.Url, "https://e/5.png", "5.png", DateTimeOffset.Now));
+        Assert.Equal(10, h.Count);
+        Assert.Equal("https://e/5.png", h[0].Value);
+        Assert.Single(h, e => e.Value == "https://e/5.png");
+    }
+
+    [Fact]
+    public async Task LoadedFilesAreRememberedAndSaved()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "imagepad-test-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var png = Path.Combine(dir, "a.png");
+            var pixels = new byte[4 * 4 * 3];
+            using (var fs = File.Create(png)) new StbImageWriteSharp.ImageWriter().WritePng(pixels, 4, 4, StbImageWriteSharp.ColorComponents.RedGreenBlue, fs);
+            var store = new JsonFileHistory(Path.Combine(dir, "history.json"));
+            await using (var session = new ImagePadSession(new FixedTargetFinder(new VrcClient("c", "127.0.0.1", 1, null, 32, 3, null)), _ => throw new InvalidOperationException(), new StbImageDecoder(), new HttpImageFetcher(), new SessionOptions { EncodePrimsLimit = 50 }, store))
+            {
+                Assert.IsType<CommandResult.Done>(await new CommandHandler(session).ExecuteAsync(new UiCommand.LoadImageFile(png)));
+                Assert.Equal(png, session.Snapshot.History[0].Value);
+            }
+            await using var reopened = new ImagePadSession(new FixedTargetFinder(new VrcClient("c", "127.0.0.1", 1, null, 32, 3, null)), _ => throw new InvalidOperationException(), new StbImageDecoder(), new HttpImageFetcher(), history: store);
+            Assert.Equal("a.png", Assert.Single(reopened.Snapshot.History).Name);
+        }
+        finally { Directory.Delete(dir, true); }
+    }
+}

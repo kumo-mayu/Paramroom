@@ -15,7 +15,10 @@ public sealed class CommandHandler(ImagePadSession session)
                 case UiCommand.LoadImageFile c: await session.LoadFileAsync(c.Path, cancellationToken); break;
                 case UiCommand.LoadImageUrl c: await session.LoadUrlAsync(c.Url, cancellationToken); break;
                 case UiCommand.LoadImagePixels c: session.SetSource(c.Image, c.Name); break;
+                case UiCommand.LoadImageData c: session.LoadBytes(c.Bytes, c.Name); break;
+                case UiCommand.ClearHistory: session.ClearHistory(); break;
                 case UiCommand.SetFit c: session.SetFit(c.Fit); break;
+                case UiCommand.SetPrimCount c: session.SetPrimCount(c.Count); break;
                 case UiCommand.RefreshTargets: await session.RefreshTargetsAsync(); break;
                 case UiCommand.SelectTarget c: session.SelectTarget(c.Name); break;
                 case UiCommand.SetSchedule c: session.SetSchedule(c.Schedule); break;

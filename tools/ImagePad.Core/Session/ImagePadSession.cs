@@ -24,6 +24,7 @@ public sealed class ImagePadSession : IAsyncDisposable
     readonly IImageDecoder decoder;
     readonly IImageFetcher fetcher;
     readonly SessionOptions options;
+    readonly ISourceHistory history;
     readonly object gate = new();
     SessionSnapshot snapshot = SessionSnapshot.Initial;
     Img? sourceImage;
@@ -31,12 +32,28 @@ public sealed class ImagePadSession : IAsyncDisposable
     Task sendTask = Task.CompletedTask;
     int lastEpoch;
 
-    public ImagePadSession(ITargetFinder finder, Func<VrcClient, IOscTransport> transportFactory, IImageDecoder decoder, IImageFetcher fetcher, SessionOptions? options = null)
+    public ImagePadSession(ITargetFinder finder, Func<VrcClient, IOscTransport> transportFactory, IImageDecoder decoder, IImageFetcher fetcher, SessionOptions? options = null, ISourceHistory? history = null)
     {
         this.finder = finder; this.transportFactory = transportFactory; this.decoder = decoder; this.fetcher = fetcher;
         this.options = options ?? new SessionOptions();
-        snapshot = snapshot with { HoldMs = this.options.HoldMs };
+        this.history = history ?? new InMemoryHistory();
+        snapshot = snapshot with { HoldMs = this.options.HoldMs, History = this.history.Load() };
     }
+
+    void Remember(SourceKind kind, string value, string name)
+    {
+        var next = Update(s => s with { History = HistoryRules.Add(s.History, new HistoryEntry(kind, value, name, DateTimeOffset.Now)) });
+        // losing the history file must not stop loading the image
+        try { history.Save(next.History); } catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
+    }
+
+    public void ClearHistory()
+    {
+        Update(s => s with { History = Array.Empty<HistoryEntry>() });
+        try { history.Save(Array.Empty<HistoryEntry>()); } catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
+    }
+
+    public void LoadBytes(byte[] bytes, string name) => SetSource(DecodeOrThrow(bytes), name);
 
     // VRChat syncs parameters about every 83-100 ms; much faster sends are dropped, much slower ones only waste time.
     // up to 3 s for very congested instances (public worlds), where parameter sync can lag by seconds
@@ -72,16 +89,21 @@ public sealed class ImagePadSession : IAsyncDisposable
         try { bytes = await File.ReadAllBytesAsync(path, cancellationToken); }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException) { throw new ImageSourceException($"ファイルを読めませんでした: {e.Message}", e); }
         SetSource(DecodeOrThrow(bytes), Path.GetFileName(path));
+        Remember(SourceKind.File, Path.GetFullPath(path), Path.GetFileName(path));
     }
 
     public async Task LoadUrlAsync(string url, CancellationToken cancellationToken = default)
     {
+        url = url.Trim();
+        if (DropParsing.BytesFromDataUri(url) is { } inline) { LoadBytes(inline, "ブラウザから落とした画像"); return; }
         byte[] bytes;
         try { bytes = await fetcher.FetchAsync(url, cancellationToken); }
         catch (HttpRequestException e) { throw new ImageSourceException($"画像を取得できませんでした。URL とネットワークを確認してください（{e.Message}）。", e); }
         catch (TaskCanceledException e) when (!cancellationToken.IsCancellationRequested) { throw new ImageSourceException("画像の取得が時間切れになりました。もう一度試すか、ファイルとして保存してから選んでください。", e); }
         var name = Uri.TryCreate(url, UriKind.Absolute, out var uri) ? Path.GetFileName(uri.LocalPath) : url;
-        SetSource(DecodeOrThrow(bytes), string.IsNullOrEmpty(name) ? url : name);
+        name = string.IsNullOrEmpty(name) ? url : name;
+        SetSource(DecodeOrThrow(bytes), name);
+        Remember(SourceKind.Url, url, name);
     }
 
     Img DecodeOrThrow(byte[] bytes)
@@ -102,6 +124,17 @@ public sealed class ImagePadSession : IAsyncDisposable
     {
         if (Snapshot.Fit == fit) return;
         Update(s => s with { Fit = fit });
+        StartEncode();
+    }
+
+    // fewer than ~50 primitives is not a picture any more (the encoder's early stop also starts at 50)
+    public const int MinPrimCount = 50;
+
+    public void SetPrimCount(int? count)
+    {
+        if (count is int c && c < MinPrimCount) throw new ImageSourceException($"図形の数は {MinPrimCount} 個以上にしてください。");
+        if (Snapshot.PrimCount == count) return;
+        Update(s => s with { PrimCount = count });
         StartEncode();
     }
 
@@ -140,7 +173,7 @@ public sealed class ImagePadSession : IAsyncDisposable
         var s = Snapshot;
         if (sourceImage is null) return;
         var spec = DecoderSpec.For(s.Target);
-        if (s.Encode is EncodeState.Ready r && r.Image.Spec.SameLayout(spec) && r.Image.Fit == s.Fit) return;
+        if (s.Encode is EncodeState.Ready r && r.Image.Spec.SameLayout(spec) && r.Image.Fit == s.Fit && r.Image.RequestedPrims == s.PrimCount) return;
         if (s.Encode is EncodeState.Running) { /* restart with the new spec */ }
         StartEncode();
     }
@@ -165,8 +198,9 @@ public sealed class ImagePadSession : IAsyncDisposable
         var s0 = Snapshot;
         var spec = DecoderSpec.For(s0.Target);
         var fit = s0.Fit;
+        var requested = s0.PrimCount;
         int P = 8 * spec.Ints - WireBitsReserved;
-        var cfg = spec.Format.Config(Math.Min(spec.Capacity, options.EncodePrimsLimit ?? int.MaxValue));
+        var cfg = spec.Format.Config(Math.Min(Math.Min(spec.Capacity, requested ?? int.MaxValue), options.EncodePrimsLimit ?? int.MaxValue));
         PrimLayout layout;
         try { layout = PrimLayout.Of(cfg, P); }
         catch (InvalidOperationException) { Update(s => s with { Encode = new EncodeState.Failed($"Int {spec.Ints} 個には図形が入りません。アバターの ImagePad を作り直してください。") }); return; }
@@ -188,7 +222,7 @@ public sealed class ImagePadSession : IAsyncDisposable
                     Update(s => ReferenceEquals(encodeCts, cts) ? s with { Encode = new EncodeState.Running(done, total) } : s);
                 }, cts.Token);
                 var preview = ToPreview(Img.FromRgbBytes(Canvas(res.Canvas), cfg.R, cfg.R), aspect);
-                var encoded = new EncodedImage(spec, fit, aspect, cfg, res.Layout, res.Units, res.Gains, res.Prims, res.Seconds, preview);
+                var encoded = new EncodedImage(spec, fit, requested, aspect, cfg, res.Layout, res.Units, res.Gains, res.Prims, res.Seconds, preview);
                 Update(s => ReferenceEquals(encodeCts, cts) ? s with { Encode = new EncodeState.Ready(encoded) } : s);
             }
             catch (OperationCanceledException) { }

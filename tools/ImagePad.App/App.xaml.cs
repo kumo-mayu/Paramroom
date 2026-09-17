@@ -22,7 +22,8 @@ public partial class App : Application
         // IMAGEPAD_TARGET=host:port[:Int の数[:format]] を付けると、VRChat を探さず決まった宛先に送る（画面の確認用。
         // 受け側は measure/osc/check-sender.js など）。付けなければ OSCQuery で VRChat を探す
         ITargetFinder finder = FixedTargetFinder.FromSpec(Environment.GetEnvironmentVariable("IMAGEPAD_TARGET")) ?? (ITargetFinder)new OscQueryTargetFinder();
-        session = new ImagePadSession(finder, c => new UdpOscTransport(c.OscIp, c.OscPort), new WicImageDecoder(), new HttpImageFetcher());
+        session = new ImagePadSession(finder, c => new UdpOscTransport(c.OscIp, c.OscPort), new WicImageDecoder(), new HttpImageFetcher(),
+            history: new JsonFileHistory(JsonFileHistory.DefaultPath()));
         var handler = new CommandHandler(session);
         var vm = new MainViewModel(session, handler);
         var window = new MainWindow(vm);

@@ -3,6 +3,7 @@
 #
 # - 起動するときは必ず IMAGEPAD_TARGET で宛先を固定する（既定は 127.0.0.1:9131）。確かめの操作で、ユーザが開いている
 #   VRChat のアバターに勝手に送らないため。VRChat へ送る確かめは、ユーザに告げてから -AllowVRChat で起動する
+# - 保存先（履歴）は IMAGEPAD_HOME で %TEMP%imagepad-ui-check-home に分ける
 # - 閉じるのは、この道具で起動したアプリだけ
 Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes, System.Drawing
 if (-not ('ImagePadWin' -as [type])) { Add-Type @"
@@ -29,6 +30,8 @@ function Start-ImagePadApp {
   $psi.UseShellExecute = $false; $psi.WorkingDirectory = Split-Path $ImagePadExe
   [void]$psi.Environment.Remove('IMAGEPAD_TARGET')
   if (-not $AllowVRChat) { $psi.Environment['IMAGEPAD_TARGET'] = $Target }
+  # 履歴などの保存先も確かめ用の場所に分ける（ユーザの履歴を書き換えない）
+  $psi.Environment['IMAGEPAD_HOME'] = (Join-Path $env:TEMP 'imagepad-ui-check-home')
   $p = [Diagnostics.Process]::Start($psi)
   for ($i = 0; $i -lt 120 -and $p.MainWindowHandle -eq 0 -and -not $p.HasExited; $i++) { Start-Sleep -Milliseconds 250; $p.Refresh() }
   if ($p.HasExited -or $p.MainWindowHandle -eq 0) { throw "窓が出なかった（pid=$($p.Id)）" }

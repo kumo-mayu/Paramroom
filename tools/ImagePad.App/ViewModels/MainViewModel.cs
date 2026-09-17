@@ -15,6 +15,14 @@ public sealed record ScheduleOption(string Name, string Label, string Descriptio
 
 public sealed record TargetOption(string Name, string Label, bool Usable) { public override string ToString() => Label; }
 
+public sealed record HistoryOption(HistoryEntry Entry)
+{
+    public string Label => (Entry.Kind == SourceKind.File ? "ファイル：" : "URL：") + Entry.Name;
+    public override string ToString() => Label;
+}
+
+public sealed record PrimCountOption(int? Count, string Label) { public override string ToString() => Label; }
+
 public sealed record HoldOption(double Milliseconds, string Label, string Description) { public override string ToString() => Label; }
 
 public sealed class MainViewModel : ViewModelBase
@@ -91,6 +99,46 @@ public sealed class MainViewModel : ViewModelBase
         else Message = "送信の間隔はミリ秒の数字で入れてください（例：350）。";
     }, () => !string.IsNullOrWhiteSpace(CustomHoldText));
     RelayCommand? applyCustomHold;
+
+    // 図形の数。アバターの上限より少なくすると、パケットが減って 1 周が短くなる（細部は粗くなる）。
+    // 上限を超える値はアバターの上限で止まる
+    public IReadOnlyList<PrimCountOption> PrimCountOptions { get; } = new[]
+    {
+        new PrimCountOption(null, "アバターの上限まで（おすすめ）"),
+        new PrimCountOption(3000, "3000 個"),
+        new PrimCountOption(2000, "2000 個"),
+        new PrimCountOption(1000, "1000 個"),
+        new PrimCountOption(500, "500 個"),
+    };
+
+    PrimCountOption? selectedPrimCount;
+    public PrimCountOption? SelectedPrimCount
+    {
+        get => selectedPrimCount;
+        set
+        {
+            if (!SetField(ref selectedPrimCount, value) || value is null || applying) return;
+            Run(new UiCommand.SetPrimCount(value.Count));
+        }
+    }
+
+    // ---- 履歴
+
+    public ObservableCollection<HistoryOption> History { get; } = new();
+
+    HistoryOption? selectedHistory;
+    public HistoryOption? SelectedHistory { get => selectedHistory; set => SetField(ref selectedHistory, value); }
+
+    public RelayCommand LoadHistoryCommand => loadHistory ??= new RelayCommand(() =>
+    {
+        if (SelectedHistory?.Entry is not { } e) return;
+        if (e.Kind == SourceKind.Url) { UrlText = e.Value; Run(new UiCommand.LoadImageUrl(e.Value)); }
+        else Run(new UiCommand.LoadImageFile(e.Value));
+    }, () => !IsBusy && SelectedHistory is not null);
+    RelayCommand? loadHistory;
+
+    public RelayCommand ClearHistoryCommand => clearHistory ??= new RelayCommand(() => Run(new UiCommand.ClearHistory()), () => History.Count > 0);
+    RelayCommand? clearHistory;
 
     // ---- 画像
 
@@ -218,6 +266,19 @@ public sealed class MainViewModel : ViewModelBase
         if (paths.Length > 0 && !IsBusy) Run(new UiCommand.LoadImageFile(paths[0]));
     }
 
+    // a URL dragged from a browser (the image itself, or a link)
+    public void LoadDroppedUrl(string url)
+    {
+        if (IsBusy) return;
+        if (!url.StartsWith("data:", StringComparison.OrdinalIgnoreCase)) UrlText = url;
+        Run(new UiCommand.LoadImageUrl(url));
+    }
+
+    public void LoadDroppedBitmap(BitmapSource bitmap)
+    {
+        if (!IsBusy) Run(new UiCommand.LoadImagePixels(Services.WicImageDecoder.FromBitmapSource(bitmap), "ドラッグした画像"));
+    }
+
     void Paste()
     {
         if (Clipboard.ContainsImage() && Clipboard.GetImage() is BitmapSource bmp)
@@ -258,6 +319,14 @@ public sealed class MainViewModel : ViewModelBase
                 SourceImage = s.Source is { } src ? ToBitmap(src.Preview) : null;
                 SourceText = s.Source is { } info ? $"{info.Name}（{info.Width} × {info.Height}）" : SourceText;
             }
+            if (!ReferenceEquals(old?.History, s.History))
+            {
+                var keep = SelectedHistory?.Entry;
+                History.Clear();
+                foreach (var e in s.History) History.Add(new HistoryOption(e));
+                SelectedHistory = History.FirstOrDefault(h => keep is not null && h.Entry.Kind == keep.Kind && h.Entry.Value == keep.Value) ?? History.FirstOrDefault();
+            }
+
             if (old?.Fit != s.Fit) { fitCrop = s.Fit == FitMode.Crop; OnPropertyChanged(nameof(FitStretch)); OnPropertyChanged(nameof(FitCrop)); }
 
             // 変換
@@ -303,6 +372,9 @@ public sealed class MainViewModel : ViewModelBase
                     : s.Targets.Any(ImagePadSession.IsUsable) ? "送信先を選んでください。"
                     : "見つかった VRChat のアバターに ImagePad が入っていません。ImagePad 入りのアバターに着替えてから「探し直す」を押してください。";
             }
+
+            if (old is null || old.PrimCount != s.PrimCount)
+                SelectedPrimCount = PrimCountOptions.FirstOrDefault(o => o.Count == s.PrimCount);
 
             if (old?.HoldMs != s.HoldMs)
             {
