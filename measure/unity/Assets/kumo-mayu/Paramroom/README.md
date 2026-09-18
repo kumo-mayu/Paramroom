@@ -52,10 +52,10 @@ QR コードは、白黒の升目そのものをパケットに載せていま�
 
 ## 入れかた
 
-1. この `Paramroom` フォルダをアバターのプロジェクトの `Assets/Paramroom` に入れる。
+1. この `Paramroom` フォルダを、`kumo-mayu` ごとアバターのプロジェクトの `Assets/` に入れる（`Assets/kumo-mayu/Paramroom` になります）。
 2. ヒエラルキーでアバター（またはその子）を選ぶ。ビルダーが空きビット数を表示します。
 3. **Tools/Paramroom/Decoder Builder** を開き、形式と Int の数を選んで作る。
-4. できた `Assets/Paramroom/ParamroomDecoder*.prefab` をアバターの直下に置く。
+4. できた `Assets/kumo-mayu/Paramroom/ParamroomDecoder*.prefab` をアバターの直下に置く。
 5. 表示板（`Display`）を見せたい位置・大きさに動かす。
 6. アバターをアップロードする。
 7. PC 側で送信アプリを起動すると、アバターを自動で見つけて送り始めます。
@@ -64,7 +64,7 @@ QR コードは、白黒の升目そのものをパケットに載せていま�
 
 | 場所 | 中身 |
 |---|---|
-| `Editor/ParamroomBuilder.cs` | **Tools/Paramroom/Decoder Builder** のウィンドウ。形式と Int の数を選び、`Assets/Paramroom/ParamroomDecoder*.prefab` を作る |
+| `Editor/ParamroomBuilder.cs` | **Tools/Paramroom/Decoder Builder** のウィンドウ。形式と Int の数を選び、`Assets/kumo-mayu/Paramroom/ParamroomDecoder*.prefab` を作る |
 | `Editor/ParamroomModularAvatar.cs` | Modular Avatar のコンポーネントを付ける共通の処理（測定用のビルダーも使う） |
 | `Shaders/ParamroomDecoder.shader` | カメラループで図形を描き直すデコーダー |
 | `Shaders/ParamroomDisplay.shader` | 表示板（縦横比に合わせて形を変える） |
@@ -87,10 +87,10 @@ QR コードは、白黒の升目そのものをパケットに載せていま�
 
 ## 測定用の道具との分け方
 
-同期の遅れや取りこぼしを測る表示板とそのビルダー、デコーダーの自動テスト（`ParamroomShaderTest`）とテストデータは `Assets/ParamroomMeasure` に置いています。アバターに入れるのは `Assets/Paramroom` だけでよいです。
+同期の遅れや取りこぼしを測る表示板とそのビルダー、デコーダーの自動テスト（`ParamroomShaderTest`）とテストデータは `Assets/ParamroomMeasure` に置いています。アバターに入れるのは `Assets/kumo-mayu/Paramroom` だけでよいです。
 
 ## 前の配置（Assets/ParamroomMeasure に全部あった版）から移すとき
 
 1. アバターのプロジェクトの `Assets/ParamroomMeasure` から、`Editor/ParamroomBuilder.cs`、`Shaders/ParamroomDecoder.shader`、`Shaders/ParamroomDisplay.shader` を消す。残すと同じクラスやシェーダーが 2 つになり、コンパイルエラーやシェーダーの取り違えが起きる。
-2. この `Paramroom` フォルダを `Assets/Paramroom` として入れる。
+2. この `Paramroom` フォルダを `Assets/kumo-mayu/Paramroom` として入れる。
 3. ビルダーでプレハブを作り直し、アバターの古い `ParamroomDecoder*` と入れ替える。古いプレハブと `GeneratedPrim*` フォルダは、消したシェーダーを指しているので消してよい。

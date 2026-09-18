@@ -46,15 +46,15 @@ VRChat の [Terms of Service](https://hello.vrchat.com/legal) /
 
 ## 入れかた
 
-1. `measure/unity/Assets/Paramroom` を、アバターのプロジェクトの `Assets/` に入れる。
+1. `measure/unity/Assets/kumo-mayu` を、アバターのプロジェクトの `Assets/` に入れる（`Assets/kumo-mayu/Paramroom` になります）。
 2. ヒエラルキーでアバター（またはその子）を選ぶ。
 3. **Tools/Paramroom/Decoder Builder** を開く。アバターの同期ビットの空きが表示されるので、
    収まる Int 数を選んで作る（**迷ったら形式 3 ＋ 32 Int**）。
-4. できた `ParamroomDecoder*.prefab` をアバターの直下に置く。
+4. できた `Assets/kumo-mayu/Paramroom/ParamroomDecoder*.prefab` をアバターの直下に置く。
 5. 表示板（`Display`）を見せたい位置・大きさに動かす。
 6. アバターをアップロードする。
 
-詳しくは [`measure/unity/Assets/Paramroom/README.md`](measure/unity/Assets/Paramroom/README.md) を見てください。
+詳しくは [`measure/unity/Assets/kumo-mayu/Paramroom/README.md`](measure/unity/Assets/kumo-mayu/Paramroom/README.md) を見てください。
 
 ## 使いかた
 
@@ -82,7 +82,7 @@ QR コードのときは、白黒の升目そのものをパケットに載せ�
 
 | 場所 | 中身 |
 |---|---|
-| `measure/unity/Assets/Paramroom/` | **アバターに入れる部品**（プレハブ生成、デコーダーのシェーダー） |
+| `measure/unity/Assets/kumo-mayu/Paramroom/` | **アバターに入れる部品**（プレハブ生成、デコーダーのシェーダー） |
 | `tools/` | **送信アプリ**（WPF）と CLI、符号化器 |
 | `sim/` | 方式を比べるためのシミュレータ（研究用） |
 | `docs/research/` | 調査報告（VRChat の仕様、既存研究、符号化方式の実験） |

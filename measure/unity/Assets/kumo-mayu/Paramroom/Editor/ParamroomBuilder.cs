@@ -25,7 +25,7 @@ using UnityEngine;
 
 public static class ParamroomBuilder
 {
-    const string Root = "Assets/Paramroom";
+    const string Root = "Assets/kumo-mayu/Paramroom";
     const int LoopLayer = 12;
 
     // format id (Paramroom_Format) -> canvas, primitives requested (the layout rounds up to whole units) and the bits of
