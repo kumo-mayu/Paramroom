@@ -49,9 +49,10 @@ VRChat の同期パラメータ（Int）だけを使って、静止画を周り�
 | `Shaders/ImagePadPrimDecoder.shader` | カメラループで図形を描き直すデコーダー |
 | `Shaders/ImagePadPrimDisplay.shader` | 表示板（縦横比に合わせて形を変える） |
 
-プレハブは Modular Avatar の Merge Animator と Parameters を使います。同期パラメータは `D0`..`D(n-1)`（Int）、それに加えて `ImagePad_Format`（**同期しない**ローカル専用の Int。送信側が形式を知るために使う）を登録します。
+プレハブは Modular Avatar の Merge Animator と Parameters を使います。同期パラメータは `KUMO_ImagePad_D0`..`KUMO_ImagePad_D(n-1)`（Int）、それに加えて `KUMO_ImagePad_Format`（**同期しない**ローカル専用の Int。送信側が形式を知るために使う）を登録します。
 
-- `D0`.. という名前は他のギミックと衝突しうるので、既に `D0` を使っている場合は Modular Avatar 側で名前を変えてください。
+- 名前に `KUMO_ImagePad_` を付けているのは、他のギミックとの衝突を避けるためです（パラメータ名は同期されないので、長くても 256 bit の枠は使いません）。
+- **2026-09-18 より前に作ったプレハブは `D0`.. という名前**です。送信アプリは両方を自動で判別するので、そのままでも送れます。
 - Write Defaults は ON で作ります（単一レイヤーの Direct Blend Tree のため）。アバター全体を OFF で統一している場合は VRChat の警告が出ます。
 
 ## 形式 6（1024px）についての注意
