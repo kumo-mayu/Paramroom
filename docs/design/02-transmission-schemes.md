@@ -187,7 +187,7 @@
 | 32bit | prim ／ pw | 同上 | fast+sqrt/8 | 同上 | wavl、pal |
 
 - pw と prim の差は開始時視聴で最大 0.005 程度と小さく、途中参加では prim が上回る。**シェーダー実装の手間を考えると prim を第一候補にするのが妥当**（pw は prim に逆ウェーブレットの復号が加わる）[推測]。
-- **2026-09-17 の決定**：基本構成を **prim 512/4000**（ImagePadPrimDecoder512）とし、送信順の既定を **fast+sqrt/8** にした。C# センダー（tools/ImagePadTool）の既定。
+- **2026-09-17 の決定**：基本構成を **prim 512/4000**（ParamroomDecoder512）とし、送信順の既定を **fast+sqrt/8** にした。C# センダー（tools/ParamroomTool）の既定。
   - **fast+sqrt/8 の中身**：1 周目は全ユニットを重要な順に送りつつ、8 スロットに 1 回を平方根則に回す。1 周目が終わったら平方根則に切り替える。
   - **根拠** [シミュレーション]（`measure/results/2026-09-17/fastfirst/README.md`、テスト 16 枚）：0.90 に届くまでの秒数は次のとおり。
 

@@ -1,8 +1,8 @@
 'use strict';
 // Export wire packets and the reference render of the QR mode, for the Unity shader test (docs/research/09).
 // The QR mode shares the packets and the store with the picture mode; only the way a canvas pixel gets its colour
-// differs, so the same test harness (ImagePadPrimTest) can check it.
-//   node export-qr-test.js "<text>" [out=../measure/unity/Assets/ImagePadMeasure/TestData] [--ec M] [--R 512] [--bytes 32]
+// differs, so the same test harness (ParamroomShaderTest) can check it.
+//   node export-qr-test.js "<text>" [out=../measure/unity/Assets/ParamroomMeasure/TestData] [--ec M] [--R 512] [--bytes 32]
 const fs = require('fs');
 const path = require('path');
 const QRCode = require('qrcode');
@@ -14,7 +14,7 @@ const opt = (k, d) => { const i = process.argv.indexOf('--' + k); return i < 0 ?
 const text = process.argv[2] || 'https://example.com/abc';
 const R = Number(opt('R', 512)), NB = Number(opt('bytes', 32)), ec = opt('ec', 'M');
 const outDir = process.argv[3] && !process.argv[3].startsWith('--')
-  ? process.argv[3] : path.join(__dirname, '..', 'measure', 'unity', 'Assets', 'ImagePadMeasure', 'TestData');
+  ? process.argv[3] : path.join(__dirname, '..', 'measure', 'unity', 'Assets', 'ParamroomMeasure', 'TestData');
 fs.mkdirSync(outDir, { recursive: true });
 const P = 8 * NB - 2;
 

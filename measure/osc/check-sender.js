@@ -1,5 +1,5 @@
 'use strict';
-// Listen for OSC bundles from a sender (e.g. tools/ImagePadTool send --port 9123) and check them against the units
+// Listen for OSC bundles from a sender (e.g. tools/ParamroomTool send --port 9123) and check them against the units
 // file: every bundle must carry D0..D31 as ,i whose 32 bytes equal [epoch][unit][aspect] of one unit; reports send
 // interval statistics.
 // usage: node check-sender.js <units.json> [--port 9123] [--epoch 1] [--seconds 5]

@@ -11,7 +11,7 @@
 ## 0. 測定キットの中身（検証済み）
 | 場所 | 内容 | 事前検証 |
 |---|---|---|
-| `measure/unity/Assets/ImagePadMeasure/` | 測定ボード／カメラループのシェーダー、プレハブ生成スクリプト | Unity 2022.3.22f1＋SDK 3.10.4＋MA 1.17.1 の一時プロジェクトでコンパイル・生成・描画を確認。描画結果を解析ツールで復号し全項目一致 |
+| `measure/unity/Assets/ParamroomMeasure/` | 測定ボード／カメラループのシェーダー、プレハブ生成スクリプト | Unity 2022.3.22f1＋SDK 3.10.4＋MA 1.17.1 の一時プロジェクトでコンパイル・生成・描画を確認。描画結果を解析ツールで復号し全項目一致 |
 | `measure/osc/sender.js` | OSC 送信（Int パラメータ D0〜D31、保持時間・送り方を変えて送信しログ記録） | パケット生成式がシェーダーと一致（20 万件照合） |
 | `measure/analysis/` | 録画の復号（`decode-video.js`）と集計（`analyze.js`） | 合成動画で欠落率が正解と完全一致 |
 
@@ -28,8 +28,8 @@
 
 ### 1.2 Unity（測定アバターの作成）
 1. Modular Avatar が入ったアバタープロジェクトを用意（例: 既存の `cleanTest` の複製）。**測定専用アバターとして別 Blueprint でアップロード**することを推奨（既存アバターを上書きしない。同じ Blueprint を複数人が着ると RenderTexture が共有される既知問題もある）。
-2. リポジトリの `measure/unity/Assets/ImagePadMeasure` フォルダをプロジェクトの `Assets/` にコピー。
-3. メニュー **Tools > ImagePad > Build Measurement Prefab (256 bit = 32 Int)** を実行 → `Assets/ImagePadMeasure/ImagePadMeasure.prefab` が生成される。
+2. リポジトリの `measure/unity/Assets/ParamroomMeasure` フォルダをプロジェクトの `Assets/` にコピー。
+3. メニュー **Tools > Paramroom > Build Measurement Prefab (256 bit = 32 Int)** を実行 → `Assets/ParamroomMeasure/ParamroomMeasure.prefab` が生成される。
 4. プレハブをアバターのルート直下に置く。ボードは胸の前（高さ 1.3m・前方 0.45m）に出る。見やすい位置に動かしてよい（回転は変えない）。
 5. **同期パラメータ予算**: このプレハブは 256bit 全部（Int×32）を使う。アバター側に他の同期パラメータがあると超過してアップロードできない。
    - 超過する場合: 他のパラメータを減らす（MA Parameters で Synced を外す等）か、128bit 版（メニューの 16 Int 版）を使う。

@@ -51,7 +51,7 @@ while (s < tEnd) {
   s += 100 + 80 * rnd();
 }
 
-// board renderer (same layout as ImagePadMeasureBoard.shader)
+// board renderer (same layout as ParamroomMeasureBoard.shader)
 function drawBoard(img, x0, y0, size, bytes, isLocal, loop) {
   const set = (x, y, r, g, b) => { const o = (y * W + x) * 3; img[o] = r; img[o + 1] = g; img[o + 2] = b; };
   const chk = checkPacket(bytes, N);

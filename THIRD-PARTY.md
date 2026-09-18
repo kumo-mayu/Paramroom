@@ -10,7 +10,7 @@
 | [VRChat.OSCQuery](https://github.com/vrchat-community/vrc-oscquery-lib) | VRChat を見つけ、アバターのパラメータを読む | MIT（VRChat Inc.） |
 | [Net.Codecrete.QrCodeGenerator](https://github.com/manuelbl/QrCodeGenerator) | QR コードの生成 | MIT |
 
-PNG の書き出しは `tools/ImagePad.Core/PngWriter.cs` の自前実装です（以前使っていた
+PNG の書き出しは `tools/Paramroom.Core/PngWriter.cs` の自前実装です（以前使っていた
 StbImageWriteSharp はライセンス表記が無く、再配布できないため外しました）。
 
 ## テスト（配布物には含まれない）

@@ -13,13 +13,13 @@ const primx = require('./codecs/primx');
 const { padBits } = require('./lib/evaluate');
 
 const P = 254;
-const R = Number(process.env.IMAGEPAD_R || 512);  // 512 by default; IMAGEPAD_R=1024 for the bigger canvas study
+const R = Number(process.env.PARAMROOM_R || 512);  // 512 by default; PARAMROOM_R=1024 for the bigger canvas study
 const FRACS = [0.05, 0.15, 0.4, 1];
 
 const { VARIANTS, cfgFor: variantCfg } = require('./lib/shape-variants');
-// IMAGEPAD_UNITS: packets of primitives (default 1000 = the 100 s cycle of today's 512/4000). Fewer packets means
+// PARAMROOM_UNITS: packets of primitives (default 1000 = the 100 s cycle of today's 512/4000). Fewer packets means
 // fewer primitives but a faster cycle, which matters for people who arrive late (docs/research/08 §19).
-const UNITS = Number(process.env.IMAGEPAD_UNITS || 1000);
+const UNITS = Number(process.env.PARAMROOM_UNITS || 1000);
 
 const cacheDir = path.join(__dirname, 'cache', 'shape');
 const outFile = path.join(__dirname, 'results', 'shapeeval.jsonl');

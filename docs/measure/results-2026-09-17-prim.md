@@ -13,7 +13,7 @@ prim 方式（楕円 1003 個、256bit = Int×32）をシェーダーでデコ�
   - B：フレンドの別クライアント。
   - どちらも同じ PC の 960×540 ウィンドウで、OBS 録画（1920×1080、60 fps）。
 - **デコーダー**
-  - プレハブ：`ImagePadPrimDecoder.prefab`。512×288 ARGBHalf のアトラスを 2 枚使うカメラループ。
+  - プレハブ：`ParamroomDecoder.prefab`。512×288 ARGBHalf のアトラスを 2 枚使うカメラループ。
   - 1 パスで 32 図形を描き、約 16 フレームで 1 回描き直す。
 - **解析**
   - `measure/analysis/prim-progress.js`：B 画面に映った表示板の四隅をホモグラフィで 256×256 に補正し、10 fps で MS-SSIM（YCbCr 6:1:1）を計算。

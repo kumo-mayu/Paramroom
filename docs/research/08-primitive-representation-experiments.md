@@ -564,7 +564,7 @@ q1024 が「近づいて見たときの見え方」にあたる。
 ### 実機で測るための用意
 
 判断には VRChat での負荷が要るので、**形式 6（1024/4000）のプレハブを作れるようにした**
-（`measure/unity/Assets/ImagePad/Editor/ImagePadPrimBuilder.cs`、送信側は `ImagePad.Core` の `DecoderFormat.Known[6]`）。
+（`measure/unity/Assets/Paramroom/Editor/ParamroomBuilder.cs`、送信側は `Paramroom.Core` の `DecoderFormat.Known[6]`）。
 
 - アトラスが 2048x1044 になり、**VRAM は 2 枚で約 33 MB**（512 は約 9 MB）
 - **1 パス（1 フレーム）の画素数が約 4 倍**。1 周に要するパス数は 512 と同じ 125 なので、フレーム当たりの負荷が約 4 倍という見積もり [推測]

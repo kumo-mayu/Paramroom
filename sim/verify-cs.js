@@ -1,5 +1,5 @@
 'use strict';
-// Verify units encoded by tools/ImagePadTool (C#) with the JS prim decoder.
+// Verify units encoded by tools/ParamroomTool (C#) with the JS prim decoder.
 // usage: node verify-cs.js <units.json> <source image> [--canvas cs-canvas.png] [--js js-render.png] [--fit stretch|crop]
 //   - decodes the units with sim/codecs/prim.js and scores the render (MS-SSIM YCbCr 6:1:1, PSNR) against the target
 //     (source stretched / cropped to R x R, as the encoders see it)

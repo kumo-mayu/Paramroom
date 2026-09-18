@@ -63,5 +63,5 @@
 C# センダーはどの候補も指定できる（送信順は JS の定義と一致を確認済み）。
 
 ```
-imagepad send <画像> --schedule fast+sqrt32/8
+paramroom send <画像> --schedule fast+sqrt32/8
 ```

@@ -1,6 +1,6 @@
 'use strict';
 // Export wire packets (32 bytes each, epoch 1) and the JS reference render of the prim codec for the Unity shader test.
-// usage: node export-prim-test.js [image=kodim23] [out=../measure/unity/Assets/ImagePadMeasure/TestData] [--stretch] [--R 512 --n 4000] [--bytes 32]
+// usage: node export-prim-test.js [image=kodim23] [out=../measure/unity/Assets/ParamroomMeasure/TestData] [--stretch] [--R 512 --n 4000] [--bytes 32]
 //   default: images/ref/<image>.png (256x256, aspect byte 0 = 1:1, as before)
 //   --stretch: images/src/<image>.png stretched to 256x256, aspect code (prim.aspectCode) in the last byte; the file
 //              name gets a "-stretch" suffix and the JSON an "aspect" field.
@@ -15,7 +15,7 @@ const R = opt('R', 256), nPrims = opt('n', 1000);
 const argv = process.argv.slice(2).filter((a, i, all) => !a.startsWith('--') && !(i > 0 && /^--(R|n|bytes)$/.test(all[i - 1])));
 const stretch = process.argv.includes('--stretch');
 const image = argv[0] || 'kodim23';
-const outDir = argv[1] || path.join(__dirname, '..', 'measure', 'unity', 'Assets', 'ImagePadMeasure', 'TestData');
+const outDir = argv[1] || path.join(__dirname, '..', 'measure', 'unity', 'Assets', 'ParamroomMeasure', 'TestData');
 fs.mkdirSync(outDir, { recursive: true });
 const NB = opt('bytes', 32), B = 8 * NB, P = B - 2; // --bytes: number of synced Int parameters
 // R = canvas texels / coordinate range (256 or 512); the decoder renders at R (cfg.out)

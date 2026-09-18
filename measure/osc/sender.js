@@ -1,5 +1,5 @@
 'use strict';
-// ImagePad measurement OSC sender (no dependencies).
+// Paramroom measurement OSC sender (no dependencies).
 // Writes Int parameters /avatar/parameters/D0..D(n-1) to VRChat (default 127.0.0.1:9000) and logs every send.
 //
 // usage:

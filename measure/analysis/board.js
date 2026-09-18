@@ -1,5 +1,5 @@
 'use strict';
-// Detect and decode ImagePad measurement boards in an RGB frame.
+// Detect and decode Paramroom measurement boards in an RGB frame.
 // Board = magenta frame (cyan segment at its top-left corner) around an 8 x 12 cell grid (see MeasureBoard shader).
 // Boards may be seen in perspective and mirrored (e.g. the wearer looking at their own board from behind):
 // the four outer corners of the magenta frame define a homography from board (u,v) to image pixels.

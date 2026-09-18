@@ -1,5 +1,5 @@
 'use strict';
-// Decode every frame of a screen recording containing ImagePad measurement boards.
+// Decode every frame of a screen recording containing Paramroom measurement boards.
 // usage: node decode-video.js <video> [--out decoded.csv] [--redetect 15]
 // Output CSV: frame,timeMs,boardIdx,x,y,w,h,seq,mode,epoch,consistent,exact,isLocal,isFriend,allZero,mismatches,loop,valid
 // Timestamps assume a constant frame rate (record with OBS at a fixed FPS, CFR).

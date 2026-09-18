@@ -1,5 +1,5 @@
 'use strict';
-// Measurement packet definition (must match Assets/ImagePadMeasure/Shaders/ImagePadMeasureBoard.shader).
+// Measurement packet definition (must match Assets/ParamroomMeasure/Shaders/ParamroomMeasureBoard.shader).
 //   byte 0-1 : sequence number (big endian, 16 bit)
 //   byte 2   : mode (0 = hash payload, 1 = sweep payload)
 //   byte 3   : epoch = test-run label (1..255, never 0)

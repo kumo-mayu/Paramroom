@@ -1,9 +1,9 @@
 'use strict';
-// Send an image to the ImagePad prim decoder (256 bit = D0..D31) over OSC.
+// Send an image to the Paramroom prim decoder (256 bit = D0..D31) over OSC.
 // usage: node send-image.js <image.png|jpg> [--epoch 1] [--hold 100] [--schedule sqrt|carousel] [--no-bundle]
 //                           [--host 127.0.0.1] [--port 9000] [--duration 0 (=forever)] [--fit stretch|crop]
-//                           [--R 256|512] [--n 1000|2000|4000]  (must match the avatar prefab: ImagePadPrimDecoder = 256/1000,
-//                           ImagePadPrimDecoder512n2000 = --R 512 --n 2000, ImagePadPrimDecoder512 = --R 512 --n 4000)
+//                           [--R 256|512] [--n 1000|2000|4000]  (must match the avatar prefab: ParamroomDecoder = 256/1000,
+//                           ParamroomDecoder512n2000 = --R 512 --n 2000, ParamroomDecoder512 = --R 512 --n 4000)
 // Encoding: sim/codecs/prim.js rotated ellipses e9.8.6-c565a2 (canvas R, n primitives; R=512 n=4000 takes ~1 min).
 // --fit stretch (default): the whole image is stretched to R x R and its aspect ratio is sent so the display
 // un-stretches it; --fit crop: centre square crop (1:1).
