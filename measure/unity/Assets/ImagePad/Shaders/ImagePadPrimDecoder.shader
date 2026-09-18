@@ -4,6 +4,14 @@
 //   [epoch 2][unit id _U][payload]   (see sim/codecs/prim.js, layout s=1, rotated ellipses)
 //   unit 0 : [bg RGB565 16][_K0 primitives]     unit i>=1 : [_K primitives]
 //   primitive: cx(_CB) cy(_CB) rx(_RB) ry(_RB) theta(_AB) r(_CR) g(_CG) b(_CBL) alpha(_ABITS)
+//
+// Two kinds of content share these packets, chosen by the sender (see sim/codecs/qrmode.js):
+//   mode 0 (picture): as above.
+//   mode 1 (QR code): the slots hold one bit per QR module instead of a primitive, row by row, and unit 0's 16-bit
+//     header holds [modules 8][reserved 8]. A canvas pixel is black when its module's bit is 1, white otherwise; a
+//     module whose packet has not arrived stays white (a reader then says "unreadable" rather than reading it wrong).
+//     A QR code of 25x25 fits in 3 packets, so it is complete in about 0.3 s.
+//   The mode is the bit just before the aspect byte in every packet, and is accepted the same way (two passes agreeing).
 // Epoch 0 is ignored (transient all-zero parameters). A new non-zero epoch clears the state.
 //
 // State atlas (RGBAHalf, double buffered: this pass reads _Src = the other buffer). C = _Canvas (256 or 512):
@@ -15,7 +23,8 @@
 //                   (4 bytes per texel, value 0..255 exact in half); present flag = byte 7 bit 0; <= 4096 primitives
 //   control         y = CTRL = C + S + 8: x0 = batch counter s, x1 = epoch, x2 = bg present,
 //                   x3 = bg RGB 0..255, x4 = accepted aspect code, x5 = aspect code of the previous valid packet,
-//                   x6 = dirty (the store changed since the running/last redraw started)
+//                   x6 = dirty (the store changed since the running/last redraw started),
+//                   x7 = accepted mode (0 picture / 1 QR), x8 = mode of the previous valid packet
 // Redraw on change: a redraw cycle (batches s = 0..nBatches-1) starts only when dirty is set; with nothing new the
 // canvas passes just copy the previous texel (steady state costs almost nothing). A packet marks dirty only if it
 // changes the store (a new unit, or different bytes), so repeated units do not trigger redraws.
@@ -172,6 +181,29 @@ Shader "ImagePad/PrimDecoder"
                 return c * (1 - a) + float3(r, g, b) * a;
             }
 
+            // QR mode: which colour does canvas pixel (px, py) have?
+            // The modules sit in the same slots the primitives use (primBits bits per slot), so the store and the
+            // packet handling are unchanged; only this lookup is different. White until the module's packet arrives.
+            float3 QrPixel(uint px, uint py, uint C, uint unitBits, uint k, uint k0, uint primBits)
+            {
+                uint n = (uint)round(Load(9, CTRL_Y).r);        // modules per side, from unit 0's header
+                if (n < 21u) return float3(255, 255, 255);
+                uint cells = n + 8u;                            // 4 modules of white margin on each side
+                uint cell = C / cells;
+                if (cell < 1u) return float3(255, 255, 255);
+                uint pad = (C - cell * cells) / 2u;
+                if (px < pad || py < pad) return float3(255, 255, 255);
+                uint cx = (px - pad) / cell, cy = (py - pad) / cell;
+                if (cx < 4u || cy < 4u || cx >= 4u + n || cy >= 4u + n) return float3(255, 255, 255);
+                uint idx = (cy - 4u) * n + (cx - 4u);
+                uint slot = idx / primBits, off = idx % primBits;
+                uint t = 2u * slot;
+                uint hi = Word(Load(t % ATLAS_W, STORE_Y + t / ATLAS_W));
+                uint lo = Word(Load((t + 1u) % ATLAS_W, STORE_Y + (t + 1u) / ATLAS_W));
+                if ((lo & 1u) == 0u) return float3(255, 255, 255);   // that packet has not arrived
+                return Field(hi, lo, off, 1u) != 0u ? float3(0, 0, 0) : float3(255, 255, 255);
+            }
+
             // store texel h (0/1) of a primitive whose bit field starts at packet bit off
             float4 SlotTexel(uint off, uint h, uint primBits)
             {
@@ -228,6 +260,8 @@ Shader "ImagePad/PrimDecoder"
                 LoadPacket();
                 uint unitBits = (uint)_U, k = (uint)_K, k0 = (uint)_K0, n = (uint)_NPrims;
                 uint lastByte = clamp((uint)_ByteCount, 1u, 32u) - 1;
+                uint totalBits = 8u * clamp((uint)_ByteCount, 1u, 32u);
+                uint modeBit = PacketBits(totalBits - 9u, 1u);   // the bit just before the aspect byte
                 uint primBits = 2 * (uint)_CB + 2 * (uint)_RB + (uint)_AB + (uint)_CR + (uint)_CG + (uint)_CBL + (uint)_ABITS;
                 uint batch = (uint)max(1.0, _BatchSize);   // guard: _BatchSize can be edited on the material
                 uint nBatches = (n + batch - 1) / batch;
@@ -270,6 +304,23 @@ Shader "ImagePad/PrimDecoder"
                         return g_pk[lastByte] == seen ? float4(g_pk[lastByte], 0, 0, 1) : prev;
                     }
                     if (px == 5) return epoch != 0 ? float4(g_pk[lastByte], 0, 0, 1) : prev;
+                    // mode, confirmed the same way as the aspect code: a value has to be seen twice in a row
+                    if (px == 7)
+                    {
+                        if (epoch == 0) return prev;
+                        uint seenMode = (uint)round(Load(8, CTRL_Y).r);
+                        if (reset) return float4(modeBit, 0, 0, 1);
+                        return modeBit == seenMode ? float4(modeBit, 0, 0, 1) : prev;
+                    }
+                    if (px == 8) return epoch != 0 ? float4(modeBit, 0, 0, 1) : prev;
+                    // modules per side (QR mode). It shares unit 0's 16-bit header with the background colour, which
+                    // the picture mode uses: only one of the two is meaningful, decided by the mode.
+                    if (px == 9)
+                    {
+                        if (reset) return float4(0, 0, 0, 1);
+                        if (epoch != 0 && unitId == 0) return float4(PacketBits(2 + unitBits, 8), 0, 0, 1);
+                        return prev;
+                    }
                     if (px == 6)
                     {
                         if (reset) return float4(1, 0, 0, 1);
@@ -312,6 +363,12 @@ Shader "ImagePad/PrimDecoder"
                         return s == 0 ? Load(px - C, py) : Load(px, py);
                     }
                     if (!reset && !drawing) return Load(px, py); // idle: nothing changed
+                    // QR mode: the canvas is the code itself, drawn in one pass (a few hundred bits, not 4000 shapes)
+                    if ((uint)round(Load(7, CTRL_Y).r) == 1u)
+                    {
+                        if (reset) return float4(255, 255, 255, 1);
+                        return float4(QrPixel(px, py, C, unitBits, k, k0, primBits), 1);
+                    }
                     float x = px * _R / C, y = py * _R / C;
                     float3 c;
                     if (s == 0 || reset)

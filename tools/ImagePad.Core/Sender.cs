@@ -19,14 +19,18 @@ public static class Aspect
 
 public static class Packets
 {
-    // [epoch 2][unit P = 8*nBytes-2 bits] -> nBytes bytes (= synced Int parameters), last byte = aspect code (unit padding)
-    public static byte[][] Build(IReadOnlyList<bool[]> units, int epoch, int aspect, int nBytes)
+    // [epoch 2][unit P = 8*nBytes-2 bits] -> nBytes bytes (= synced Int parameters). The spare bits at the end carry
+    // [mode 1][aspect 8]: the aspect code in the last byte, and the bit before it says whether the packet holds a
+    // picture (0) or a QR code (1). Both ride in every packet, so a viewer who joins late knows immediately.
+    public static byte[][] Build(IReadOnlyList<bool[]> units, int epoch, int aspect, int nBytes, bool qr = false)
     {
+        int total = 8 * nBytes;
         return units.Select(u =>
         {
-            var bits = new bool[8 * nBytes];
+            var bits = new bool[total];
             bits[0] = ((epoch >> 1) & 1) == 1; bits[1] = (epoch & 1) == 1;
-            Array.Copy(u, 0, bits, 2, Math.Min(u.Length, 8 * nBytes - 2));
+            Array.Copy(u, 0, bits, 2, Math.Min(u.Length, total - 2));
+            bits[total - 9] = qr;
             var bytes = new byte[nBytes];
             for (int i = 0; i < nBytes; i++) { int v = 0; for (int k = 0; k < 8; k++) v = (v << 1) | (bits[i * 8 + k] ? 1 : 0); bytes[i] = (byte)v; }
             bytes[nBytes - 1] = (byte)aspect;

@@ -270,6 +270,40 @@ public class FormatTests
         Assert.Equal(expected, DecoderFormat.Known[formatId].GoodIntCounts().ToArray());
 
     // an avatar newer than this build must be reported, not silently treated as format 3
+    // The QR mode shares the packets with the picture mode; these check the packing the shader relies on.
+    [Fact]
+    public void QrFitsInAFewPackets()
+    {
+        var f = DecoderFormat.Known[3];
+        var L = PrimLayout.Of(f.Config(f.N), 254);
+        var qr = QrMode.Build("https://example.com/abc");
+        Assert.Equal(25, qr.Modules);                       // version 2
+        Assert.Equal(3, QrMode.UnitsNeeded(L, qr.Modules)); // 625 bits at 58 bits per slot
+        var units = QrMode.Encode(qr, L, 254);
+        Assert.Equal(3, units.Count);
+        // unit 0 carries the module count in the 16-bit header the picture mode uses for the background colour
+        int n = 0;
+        for (int i = 0; i < 8; i++) n = (n << 1) | (units[0][L.U + i] ? 1 : 0);
+        Assert.Equal(25, n);
+        // the first module bit sits right after the header (a QR code always starts with a black finder module)
+        Assert.True(units[0][L.U + 16]);
+    }
+
+    [Fact]
+    public void QrModeBitRidesInEveryPacket()
+    {
+        var f = DecoderFormat.Known[3];
+        var L = PrimLayout.Of(f.Config(f.N), 254);
+        var units = QrMode.Encode(QrMode.Build("https://example.com/abc"), L, 254);
+        foreach (var p in Packets.Build(units, 1, 128, 32, qr: true))
+        {
+            Assert.Equal(128, p[31]);            // aspect code still in the last byte
+            Assert.Equal(1, p[30] & 1);          // mode bit is the one before it (bit 247 = lowest bit of byte 30)
+        }
+        foreach (var p in Packets.Build(units, 1, 128, 32, qr: false))
+            Assert.Equal(0, p[30] & 1);
+    }
+
     // a picture with too many pixels must be refused with a message, not end as an out-of-memory error
     [Fact]
     public void HugeImagesAreRefused()

@@ -19,6 +19,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Net.Codecrete.QrCodeGenerator" Version="3.2.1" />
     <PackageReference Include="StbImageSharp" Version="2.30.16" />
     <PackageReference Include="VRChat.OSCQuery" Version="0.0.7" />
   </ItemGroup>
