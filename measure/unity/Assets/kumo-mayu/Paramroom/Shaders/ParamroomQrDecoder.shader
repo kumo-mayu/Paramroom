@@ -17,7 +17,8 @@
 //   size 64 x (M + 1)
 //   cells     y [0, M)   x [0, M)   r = 1 black, 0 white (a cell whose packet has not arrived stays white, so a
 //                                   reader says "unreadable" rather than reading it wrong)
-//   control   y = M      x0 = epoch, x1 = version (0 = not known yet)
+//   control   y = M      x0 = epoch, x1 = version (0 = not known yet),
+//                        x2..x5 = the packet bytes the deciding pass saw last frame
 // Every texel depends only on the previous buffer and the current packet => idempotent and order independent.
 Shader "Paramroom/QrDecoder"
 {
@@ -29,6 +30,7 @@ Shader "Paramroom/QrDecoder"
         _U ("Unit id bits", Float) = 8
         _Pay ("Cells per unit", Float) = 22
         _MaxSide ("Largest QR side (17 + 4 * version)", Float) = 57
+        _Primary ("This is the deciding pass (camera A)", Float) = 0
         _P0 ("P0", Float) = 0
         _P1 ("P1", Float) = 0
         _P2 ("P2", Float) = 0
@@ -59,7 +61,7 @@ Shader "Paramroom/QrDecoder"
             #include "UnityCG.cginc"
 
             Texture2D<float4> _Src;
-            float _Far, _ByteCount, _U, _Pay, _MaxSide;
+            float _Far, _ByteCount, _U, _Pay, _MaxSide, _Primary;
             float _P0, _P1, _P2, _P3, _P4, _P5, _P6, _P7, _P8, _P9, _P10, _P11, _P12, _P13, _P14, _P15;
 
             static const uint HEAD = 6;     // version, 1..40 sent as 0..39
@@ -96,6 +98,25 @@ Shader "Paramroom/QrDecoder"
             }
             float4 Load(uint x, uint y) { return _Src.Load(int3(x, y, 0)); }
 
+            // Torn packets (docs/research/10): VRChat can apply half an OSC bundle in one frame, so a packet may be
+            // read as "front half new, back half old". Written to the grid it shows as a band of wrong cells until that
+            // packet comes round again. Such a value is visible for a whole frame, so only the deciding pass (camera A)
+            // takes packets, and only ones that were already there one frame earlier; the other pass copies.
+            static const uint PREV_X = 2;   // control texels holding the bytes the deciding pass saw last frame
+            float4 CurPacketTexel(uint i, uint nBytes)
+            {
+                uint b = i * 4;
+                return float4(b + 0 < nBytes ? g_pk[b + 0] : 0, b + 1 < nBytes ? g_pk[b + 1] : 0,
+                              b + 2 < nBytes ? g_pk[b + 2] : 0, b + 3 < nBytes ? g_pk[b + 3] : 0);
+            }
+            bool PacketHeldSinceLastFrame(uint nBytes, uint ctrlY)
+            {
+                uint texels = (nBytes + 3) / 4;
+                for (uint i = 0; i < texels; i++)
+                    if (any(abs(round(Load(PREV_X + i, ctrlY)) - CurPacketTexel(i, nBytes)) > 0.5)) return false;
+                return true;
+            }
+
             bool Skipped(uint n, uint x, uint y)
             {
                 return (y < CORNER && (x < CORNER || x >= n - CORNER)) || (y >= n - CORNER && x < CORNER);
@@ -131,17 +152,22 @@ Shader "Paramroom/QrDecoder"
 
                 uint epoch = PacketBits(0, 2);
                 uint storedEpoch = (uint)round(Load(0, CTRL_Y).r);
-                bool reset = epoch != 0 && epoch != storedEpoch;
+                uint nBytes = clamp((uint)_ByteCount, 1u, 16u);
+                bool primary = _Primary > 0.5;
+                bool consume = primary && epoch != 0 && PacketHeldSinceLastFrame(nBytes, CTRL_Y);
+                bool reset = consume && epoch != storedEpoch;
                 uint unitId = PacketBits(2, unitBits);
                 uint storedVer = (uint)round(Load(1, CTRL_Y).r);
-                uint packetVer = (epoch != 0 && unitId == 0) ? PacketBits(2 + unitBits, HEAD) + 1 : 0;
+                uint packetVer = (consume && unitId == 0) ? PacketBits(2 + unitBits, HEAD) + 1 : 0;
                 uint version = packetVer != 0 ? packetVer : (reset ? 0 : storedVer);
 
                 // ---- control row
                 if (py == CTRL_Y)
                 {
-                    if (px == 0) return float4(epoch != 0 ? epoch : storedEpoch, 0, 0, 1);
+                    if (px == 0) return float4(consume ? epoch : storedEpoch, 0, 0, 1);
                     if (px == 1) return float4(version, 0, 0, 1);
+                    // the bytes this pass saw, for the next frame to compare against
+                    if (px >= PREV_X && px < PREV_X + 4) return primary ? CurPacketTexel(px - PREV_X, nBytes) : Load(px, py);
                     return Load(px, py);
                 }
 
@@ -151,7 +177,7 @@ Shader "Paramroom/QrDecoder"
                 uint n = 17 + 4 * version;
                 if (px >= n || py >= n || px >= M || py >= M) return float4(0, 0, 0, 1);
                 if (Skipped(n, px, py)) return float4(Finder(n, px, py) ? 1 : 0, 0, 0, 1);
-                if (epoch == 0) return float4(prev, 0, 0, 1);            // transient all-zero parameters
+                if (!consume) return float4(prev, 0, 0, 1);              // 取り込まないパスと半端なパケットは無視
 
                 uint j = py * n + px - SkippedBefore(n, px, py);
                 uint id = j < first ? 0 : 1 + (j - first) / pay;

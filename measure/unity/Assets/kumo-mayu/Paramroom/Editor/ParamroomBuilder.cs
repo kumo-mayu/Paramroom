@@ -134,9 +134,10 @@ public static class ParamroomBuilder
         var rtA = Atlas("ParamroomAtlasA" + suffix);
         var rtB = Atlas("ParamroomAtlasB" + suffix);
         var matA = Save(new Material(decShader) { name = "ParamroomDecA" }, "ParamroomDecA.mat");
-        matA.SetTexture("_Src", rtB); matA.SetFloat("_Far", farA);
+        // _Primary: 半端パケットを弾く判定をするのは A のパスだけ（docs/research/10）。B は写すだけ。
+        matA.SetTexture("_Src", rtB); matA.SetFloat("_Far", farA); matA.SetFloat("_Primary", 1);
         var matB = Save(new Material(decShader) { name = "ParamroomDecB" }, "ParamroomDecB.mat");
-        matB.SetTexture("_Src", rtA); matB.SetFloat("_Far", farB);
+        matB.SetTexture("_Src", rtA); matB.SetFloat("_Far", farB); matB.SetFloat("_Primary", 0);
         var dispMat = Save(new Material(dispShader) { name = "ParamroomDisplay" }, "ParamroomDisplay.mat");
         dispMat.SetTexture("_Atlas", rtA); dispMat.SetFloat("_Canvas", canvas); dispMat.SetFloat("_StoreTexels", storeTexels);
         foreach (var m in new[] { matA, matB })
@@ -292,9 +293,9 @@ public static class ParamroomBuilder
         var rtA = Atlas("ParamroomQrAtlasA_" + bytes);
         var rtB = Atlas("ParamroomQrAtlasB_" + bytes);
         var matA = Save(new Material(decShader) { name = "ParamroomQrDecA" }, "ParamroomQrDecA.mat");
-        matA.SetTexture("_Src", rtB); matA.SetFloat("_Far", farA);
+        matA.SetTexture("_Src", rtB); matA.SetFloat("_Far", farA); matA.SetFloat("_Primary", 1);
         var matB = Save(new Material(decShader) { name = "ParamroomQrDecB" }, "ParamroomQrDecB.mat");
-        matB.SetTexture("_Src", rtA); matB.SetFloat("_Far", farB);
+        matB.SetTexture("_Src", rtA); matB.SetFloat("_Far", farB); matB.SetFloat("_Primary", 0);
         var dispMat = Save(new Material(dispShader) { name = "ParamroomQrDisplay" }, "ParamroomQrDisplay.mat");
         dispMat.SetTexture("_Atlas", rtA); dispMat.SetFloat("_MaxSide", QrMaxSide); dispMat.SetFloat("_Quiet", 4);
         foreach (var m in new[] { matA, matB })

@@ -60,6 +60,8 @@ public static class ParamroomShaderTest
                 m.SetFloat("_CB", Opt("cb", 9)); m.SetFloat("_RB", Opt("rb", 8)); m.SetFloat("_AB", Opt("ab", 6)); m.SetFloat("_ABITS", Opt("aBits", 2));
                 if (colM.Success) { m.SetFloat("_CR", int.Parse(colM.Groups[1].Value)); m.SetFloat("_CG", int.Parse(colM.Groups[2].Value)); m.SetFloat("_CBL", int.Parse(colM.Groups[3].Value)); }
             }
+            // 半端パケットを弾く判定をするのは A のパスだけ（docs/research/10）
+            matA.SetFloat("_Primary", 1); matB.SetFloat("_Primary", 0);
             Camera MakeCam(Vector3 pos, RenderTexture target, Material mat, RenderTexture src, float far)
             {
                 var go = new GameObject("primcam") { layer = 12 };
@@ -125,6 +127,23 @@ public static class ParamroomShaderTest
             var p1 = ReadAtlas();
             var cmp = Compare(p1);
             Debug.Log($"[Paramroom] prim test {dataName}: C={C} R={R} u={U} n={NPrims} batches={nBatches}; packets={nPackets} x hold {Hold}: {feedMs} ms; settle {nBatches * 2 + 4} steps {sw2.ElapsedMilliseconds} ms; display vs expected maxdiff={cmp.maxDiff} (flip {cmp.flip}); counter={Ctrl(p1, 0).r} dirty={Ctrl(p1, 6).r} epoch={Ctrl(p1, 1).r}");
+
+            // 半端パケット（docs/research/10）: 前半が新しいパケット・後半が古いパケットという値を
+            // 1 フレームだけ見せる。取り込んでしまうと図形が壊れ、絵が崩れたまま残る。
+            void SetMixed(int newK, int oldK, int frontBytes)
+            {
+                for (int b = 0; b < NB; b++)
+                {
+                    float v = nums[(b < frontBytes ? newK : oldK) * NB + b];
+                    matA.SetFloat($"_P{b}", v); matB.SetFloat($"_P{b}", v);
+                }
+            }
+            for (int mix = 1; mix < NB; mix++) { SetMixed(mix % nPackets, (mix * 7 + 3) % nPackets, mix); Step(); }
+            SetPacket(nPackets - 1); for (int h = 0; h < Hold; h++) Step();
+            Settle(); Sync();
+            var pt = ReadAtlas();
+            var cmpTorn = Compare(pt);
+            Debug.Log($"[Paramroom] prim torn: {NB - 1} 個の半端パケットを流したあと display vs expected maxdiff={cmpTorn.maxDiff}（弾けていれば {cmp.maxDiff} のまま）");
 
             // idle timing
             var sw3 = System.Diagnostics.Stopwatch.StartNew(); for (int s = 0; s < 120; s++) Step(); Sync(); sw3.Stop();

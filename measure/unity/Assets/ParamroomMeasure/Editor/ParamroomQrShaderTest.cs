@@ -50,6 +50,8 @@ public static class ParamroomQrShaderTest
             {
                 m.SetFloat("_ByteCount", NB); m.SetFloat("_U", U); m.SetFloat("_Pay", Pay); m.SetFloat("_MaxSide", M);
             }
+            // 半端パケットを弾く判定をするのは A のパスだけ（docs/research/10）
+            matA.SetFloat("_Primary", 1); matB.SetFloat("_Primary", 0);
             Camera MakeCam(Vector3 pos, RenderTexture target, Material mat, RenderTexture src, float far)
             {
                 var go = new GameObject("qrcam") { layer = 12 };
@@ -114,6 +116,28 @@ public static class ParamroomQrShaderTest
                     if (Black(all, x, y) != (grid[y * n + x] == '1')) wrong++;
             Check(wrong == 0, $"全部届いた後、元の QR と一致（食い違い {wrong} / {n * n} マス）");
             Check(Math.Abs(all[ctrlY * W + 1].r - (n - 17) / 4) < 0.01f, $"制御行に版が入っている（{all[ctrlY * W + 1].r}）");
+
+            // ---- 半端パケット（docs/research/10）: 前半が新しいパケット・後半が古いパケットという値を
+            // 1 フレームだけ見せる。受信側はこれを取り込んではいけない。
+            void SetMixed(int newK, int oldK, int frontBytes)
+            {
+                for (int b = 0; b < NB; b++)
+                {
+                    float v = nums[(b < frontBytes ? newK : oldK) * NB + b];
+                    matA.SetFloat($"_P{b}", v); matB.SetFloat($"_P{b}", v);
+                }
+            }
+            var before = ReadAtlas();
+            for (int mix = 1; mix < NB; mix++)
+            {
+                SetMixed(0, nPackets - 1, mix);
+                Step();                      // 1 フレームだけ（VRChat で見える半端な値の持続と同じ）
+            }
+            SetPacket(nPackets - 1); Step();  // 正しいパケットに戻るが、まだ 1 フレーム目
+            var afterTorn = ReadAtlas();
+            int changed = 0;
+            for (int y = 0; y < n; y++) for (int x = 0; x < n; x++) if (Black(afterTorn, x, y) != Black(before, x, y)) changed++;
+            Check(changed == 0, $"半端パケットを取り込まなかった（変わったマス {changed}）");
 
             // ---- a new epoch clears the grid
             SetPacket(nPackets - 1, 2);          // epoch 2, last unit: nothing else can be placed yet
