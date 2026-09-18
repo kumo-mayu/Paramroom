@@ -304,15 +304,11 @@ public sealed class ParamroomSession : IAsyncDisposable
             {
                 var data = QrOnly.Build(qr);
                 var units = QrOnly.Encode(data, qL);
-                var r = new QrOnlyRenderer(qL);
-                foreach (var u in units) r.Apply(u);
-                var (side, px) = r.Render();
-                var rgb = new byte[side * side * 3];
-                for (int i = 0; i < side * side; i++) rgb[i * 3] = rgb[i * 3 + 1] = rgb[i * 3 + 2] = px[i];
-                var prev = ToPreview(Img.FromRgbBytes(rgb, side, side), Aspect.Code(1, 1));
+                var (rgb, side) = RenderQrOnly(qL, units.Select(u => (bool[]?)u).ToList());
+                var prev = ToPreview(Img.FromRgbBytes(rgb, side, side), Aspect.Code(1, 1), nearest: true);
                 var cfgQr = spec.Format.Config(1);
                 var image = new EncodedImage(spec, fit, requested, Aspect.Code(1, 1), cfgQr, PrimLayout.Of(cfgQr, 254), units,
-                    Enumerable.Repeat(1.0, units.Count).ToArray(), data.Modules * data.Modules, 0, prev, Qr: true);
+                    Enumerable.Repeat(1.0, units.Count).ToArray(), data.Modules * data.Modules, 0, prev, Qr: true, QrOnlyLayout: qL);
                 Update(s => s with { Encode = new EncodeState.Ready(image) });
             }
             catch (Exception e)
@@ -386,12 +382,13 @@ public sealed class ParamroomSession : IAsyncDisposable
     }
 
     // the image as the avatar shows it: the square canvas reshaped to the aspect ratio, long side PreviewLongSide
-    Preview ToPreview(Img square, int aspectCode)
+    // nearest = 升目の絵（QR）。なめらかに拡大するとぼやけて、画面上で読めなくなる
+    Preview ToPreview(Img square, int aspectCode, bool nearest = false)
     {
         double ratio = Aspect.Ratio(aspectCode);
         int L = options.PreviewLongSide;
         int w = ratio >= 1 ? L : Math.Max(1, (int)Math.Round(L * ratio)), h = ratio >= 1 ? Math.Max(1, (int)Math.Round(L / ratio)) : L;
-        var img = square.Resize(w, h);
+        var img = nearest && w >= square.W ? square.ResizeNearest(w, h) : square.Resize(w, h);
         return new Preview(img.ToRgbBytes(), w, h);
     }
 
@@ -434,9 +431,22 @@ public sealed class ParamroomSession : IAsyncDisposable
     }
 
     // what the receivers have so far, drawn the way their decoder would (a picture or a QR code)
-    static byte[] RenderReceived(EncodedImage image, IReadOnlyList<bool[]?> received) =>
-        image.Qr ? QrRenderer.Render(image.Config.R, image.Layout, received)
-                 : PrimRenderer.Render(image.Config, image.Layout, received);
+    // QR 専用のときは 1 マス 1 画素（＋余白）なので、画像モードとは大きさが違う
+    static (byte[] Rgb, int Side) RenderQrOnly(QrOnly.Layout L, IReadOnlyList<bool[]?> received)
+    {
+        var r = new QrOnlyRenderer(L);
+        foreach (var u in received) if (u is not null) r.Apply(u);
+        var (side, px) = r.Render();
+        var rgb = new byte[side * side * 3];
+        for (int i = 0; i < side * side; i++) rgb[i * 3] = rgb[i * 3 + 1] = rgb[i * 3 + 2] = px[i];
+        return (rgb, side);
+    }
+
+    // 受け取った人に見えている絵。QR 専用・QR モード・画像で描き方が違う
+    static (byte[] Rgb, int Side) RenderReceived(EncodedImage image, IReadOnlyList<bool[]?> received) =>
+        image.QrOnlyLayout is { } qL ? RenderQrOnly(qL, received)
+        : image.Qr ? (QrRenderer.Render(image.Config.R, image.Layout, received), image.Config.R)
+                   : (PrimRenderer.Render(image.Config, image.Layout, received), image.Config.R);
 
     // null while the target still matches what was encoded; otherwise the message to show
     async Task<string?> CheckTargetStillFits(EncodedImage image)
@@ -487,7 +497,8 @@ public sealed class ParamroomSession : IAsyncDisposable
                 var now = sw.Elapsed;
                 if (distinct != renderedDistinct && now - lastRender >= options.ReceivedPreviewInterval)
                 {
-                    receivedPreview = ToPreview(Img.FromRgbBytes(RenderReceived(image, received), image.Config.R, image.Config.R), image.Aspect);
+                    var (recvRgb, recvSide) = RenderReceived(image, received);
+                    receivedPreview = ToPreview(Img.FromRgbBytes(recvRgb, recvSide, recvSide), image.Aspect, nearest: image.Qr);
                     renderedDistinct = distinct; lastRender = now;
                     progress = progress with { Received = receivedPreview };
                 }
@@ -515,7 +526,10 @@ public sealed class ParamroomSession : IAsyncDisposable
                 }
             }
             if (renderedDistinct != distinct)
-                progress = progress with { Received = ToPreview(Img.FromRgbBytes(RenderReceived(image, received), image.Config.R, image.Config.R), image.Aspect) };
+            {
+                var (lastRgb, lastSide) = RenderReceived(image, received);
+                progress = progress with { Received = ToPreview(Img.FromRgbBytes(lastRgb, lastSide, lastSide), image.Aspect, nearest: image.Qr) };
+            }
             var final = progress with { PacketsSent = sent, DistinctUnits = distinct, Elapsed = sw.Elapsed };
             Update(s => s.Send is SendState.Active ? s with { Send = new SendState.Stopped(final) } : s);
         }

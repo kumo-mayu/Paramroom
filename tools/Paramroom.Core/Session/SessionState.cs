@@ -58,9 +58,12 @@ public abstract record EncodeState
 
 // Qr = the units hold a QR code's modules instead of primitives (docs/research/09). The packets are the same shape;
 // a bit in every packet tells the avatar which one it is, so any prefab can show either.
+// QrOnlyLayout != null = QR 専用のデコーダー向け（docs/research/09 §6）。Config と Layout は図形用の
+// 値なので意味を持たない。絵を描くときはこちらを見ること。
 public sealed record EncodedImage(
     DecoderSpec Spec, FitMode Fit, int? RequestedPrims, int Aspect, PrimConfig Config, PrimLayout Layout,
-    IReadOnlyList<bool[]> Units, double[] Gains, int Prims, double Seconds, Preview Preview, bool Qr = false);
+    IReadOnlyList<bool[]> Units, double[] Gains, int Prims, double Seconds, Preview Preview, bool Qr = false,
+    QrOnly.Layout? QrOnlyLayout = null);
 
 public sealed record SendProgress(
     int Epoch, string Schedule, string TargetName, long PacketsSent, int DistinctUnits, int TotalUnits,

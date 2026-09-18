@@ -76,6 +76,22 @@ public sealed class Img
         return w <= W && h <= H ? ResizeArea(w, h) : ResizeBilinear(w, h);
     }
 
+    // 最近傍。QR のような升目の絵を拡大するのに使う（なめらかに拡大するとぼやけて読めなくなる）
+    public Img ResizeNearest(int w, int h)
+    {
+        var o = new Img(w, h);
+        for (int Y = 0; Y < h; Y++)
+        {
+            int sy = Math.Min(H - 1, (int)((long)Y * H / h));
+            for (int X = 0; X < w; X++)
+            {
+                int sx = Math.Min(W - 1, (int)((long)X * W / w));
+                for (int c = 0; c < 3; c++) o.Data[(Y * w + X) * 3 + c] = Data[(sy * W + sx) * 3 + c];
+            }
+        }
+        return o;
+    }
+
     Img ResizeArea(int w, int h)
     {
         var o = new Img(w, h);
