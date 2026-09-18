@@ -7,7 +7,7 @@ using VRC.OSCQuery;
 namespace Paramroom;
 
 public sealed record VrcClient(string Name, string OscIp, int OscPort, string? AvatarId, int ParamroomParams, int? Format, string? Problem,
-    string? QueryIp = null, int QueryPort = 0, string ParamPrefix = "")
+    string? QueryIp = null, int QueryPort = 0, string ParamPrefix = "", bool Reachable = true)
 {
     public override string ToString() => $"{Name}: OSC {OscIp}:{OscPort}, avatar {AvatarId}, Paramroom Int params {(ParamroomParams > 0 ? $"{ParamroomParams} (D0..D{ParamroomParams - 1})" : "0")}, format {(Format?.ToString() ?? "-")}{(Problem != null ? " (" + Problem + ")" : "")}";
 }
@@ -86,31 +86,18 @@ public static class VrcDiscovery
 {
     public const int MaxParams = 32;
 
+    // One-shot search for the CLI: a temporary service that lives only for this call. The app keeps one VrcConnection
+    // instead, so that it does not announce itself on new ports every time it looks (see VrcConnection).
     public static async Task<List<VrcClient>> FindAsync(double waitSec)
     {
-        var found = new Dictionary<string, OSCQueryServiceProfile>();
-        using var svc = new OSCQueryServiceBuilder()
-            .WithServiceName("Paramroom-Sender")
-            .WithTcpPort(Extensions.GetAvailableTcpPort())
-            .WithUdpPort(Extensions.GetAvailableUdpPort())
-            .WithDefaults()
-            .Build();
-        void Add(OSCQueryServiceProfile p) { if (p?.name != null && p.name.StartsWith("VRChat-Client")) lock (found) found[p.name] = p; }
-        svc.OnOscQueryServiceAdded += Add;
-        var until = DateTime.UtcNow.AddSeconds(waitSec);
-        while (DateTime.UtcNow < until)
-        {
-            svc.RefreshServices();
-            foreach (var p in svc.GetOSCQueryServices()) Add(p);
-            await Task.Delay(500);
-        }
+        using var conn = new VrcConnection();
+        return await InspectAllAsync(await conn.VrchatServicesAsync(waitSec));
+    }
+
+    public static async Task<List<VrcClient>> InspectAllAsync(IEnumerable<OSCQueryServiceProfile> profiles)
+    {
         var clients = new List<VrcClient>();
-        List<OSCQueryServiceProfile> profiles;
-        lock (found) profiles = found.Values.ToList();
-        foreach (var p in profiles)
-        {
-            clients.Add(await InspectAsync(p.name, p.address, p.port));
-        }
+        foreach (var p in profiles) clients.Add(await InspectAsync(p.name, p.address, p.port));
         return clients.OrderBy(c => c.OscPort).ToList();
     }
 
@@ -145,7 +132,7 @@ public static class VrcDiscovery
                 string ip = string.IsNullOrEmpty(host.oscIP) || host.oscIP == "0.0.0.0" ? p.address.ToString() : host.oscIP;
                 return new VrcClient(p.name, ip, host.oscPort, avatar, ok, format, problem, p.address.ToString(), p.port, prefix);
             }
-            catch (Exception e) { return new VrcClient(p.name, p.address.ToString(), 0, null, 0, null, "query failed: " + e.Message, p.address.ToString(), p.port); }
+            catch (Exception e) { return new VrcClient(p.name, p.address.ToString(), 0, null, 0, null, "query failed: " + e.Message, p.address.ToString(), p.port, Reachable: false); }
         }
     }
 
