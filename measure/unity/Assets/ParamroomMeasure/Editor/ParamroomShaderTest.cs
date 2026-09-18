@@ -15,7 +15,9 @@ using UnityEngine;
 
 public static class ParamroomShaderTest
 {
-    const int Hold = 3; // loop steps per packet
+    // 1 パケットを何フレーム保持するか。VRChat では 100 ms 保持なので、受信側の fps を 10 で割った値になる
+    // （60 fps なら 6、30 fps なら 3、20 fps なら 2）。半端パケットの判定は 2 フレーム必要（docs/research/10）。
+    static int Hold = 3;
 
     public static void Run()
     {
@@ -24,6 +26,8 @@ public static class ParamroomShaderTest
         string outDir = oi >= 0 ? args[oi + 1] : "ParamroomShaderTest";
         int di = Array.IndexOf(args, "-paramroomData");
         string dataName = di >= 0 ? args[di + 1] : "prim-kodim23";
+        int hi = Array.IndexOf(args, "-paramroomHold");
+        if (hi >= 0) Hold = int.Parse(args[hi + 1]);
         System.IO.Directory.CreateDirectory(outDir);
         try
         {
