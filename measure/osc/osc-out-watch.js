@@ -81,6 +81,21 @@ recv.bind(outPort, '127.0.0.1', () => {
       gaps.sort((a, b) => a - b);
       const q = p => gaps[Math.min(gaps.length - 1, Math.floor(gaps.length * p))];
       console.log(`  出てきた間隔 ミリ秒: 中央 ${q(0.5)} / 90% ${q(0.9)} / 最大 ${gaps[gaps.length - 1]}`);
+      // VRChat がフレームごとにまとめて出しているなら、到着は塊になる。塊と塊の間隔が
+      // 実際のループ周期（＝本当のフレームレート）。描画だけ止めて Update が回っている場合と区別できる。
+      const burst = [];
+      let last = seen[0].t, count = 1;
+      for (let i = 1; i < seen.length; i++) {
+        if (seen[i].t - seen[i - 1].t > 5) { burst.push({ gap: seen[i].t - last, n: count }); last = seen[i].t; count = 1; }
+        else count++;
+      }
+      if (burst.length > 3) {
+        const bg = burst.map(b => b.gap).sort((x, y) => x - y);
+        const bq = p => bg[Math.min(bg.length - 1, Math.floor(bg.length * p))];
+        const avgN = burst.reduce((a, b) => a + b.n, 0) / burst.length;
+        console.log(`  塊の間隔 ミリ秒: 中央 ${bq(0.5)} / 10% ${bq(0.1)} / 90% ${bq(0.9)}（塊 ${burst.length} 個、1 塊あたり ${avgN.toFixed(1)} 個）`);
+        console.log(`  → ループ周期がこの間隔なら、実際のフレームレートは約 ${(1000 / bq(0.5)).toFixed(0)} fps`);
+      }
       console.log(`  拾えた割合: ${((seq.length) / sentCount * 100).toFixed(0)} %（値の変化 ÷ 送った数）`);
     }, 500);
   }, seconds * 1000);
