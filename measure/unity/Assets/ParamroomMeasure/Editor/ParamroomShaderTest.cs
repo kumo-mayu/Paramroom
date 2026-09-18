@@ -49,7 +49,7 @@ public static class ParamroomShaderTest
 
             var shader = Shader.Find("Paramroom/Decoder");
             if (shader == null) throw new Exception("PrimDecoder shader missing");
-            RenderTexture MakeAtlas() { var d = new RenderTextureDescriptor(W, H, RenderTextureFormat.ARGBHalf, 0) { sRGB = false }; var rt = new RenderTexture(d) { filterMode = FilterMode.Point }; rt.Create(); return rt; }
+            RenderTexture MakeAtlas() { var d = new RenderTextureDescriptor(W, H, RenderTextureFormat.ARGB32, 0) { sRGB = false }; var rt = new RenderTexture(d) { filterMode = FilterMode.Point }; rt.Create(); return rt; }
             var rtA = MakeAtlas(); var rtB = MakeAtlas();
             var quadMesh = Resources.GetBuiltinResource<Mesh>("Quad.fbx");
             Material matA = new Material(shader), matB = new Material(shader);
@@ -85,9 +85,11 @@ public static class ParamroomShaderTest
             void Step() { camA.Render(); camB.Render(); }
             Color[] ReadAtlas()
             {
-                var tex = new Texture2D(W, H, TextureFormat.RGBAHalf, false);
+                var tex = new Texture2D(W, H, TextureFormat.RGBA32, false);
                 RenderTexture.active = rtA; tex.ReadPixels(new Rect(0, 0, W, H), 0, 0); tex.Apply(); RenderTexture.active = null;
-                var p = tex.GetPixels(); UnityEngine.Object.DestroyImmediate(tex); return p;
+                var p = tex.GetPixels(); UnityEngine.Object.DestroyImmediate(tex);
+                for (int i = 0; i < p.Length; i++) p[i] *= 255;   // ARGB32: 0..1 で入っているので 0..255 に戻す
+                return p;
             }
             // readback index y*W+x = shader texel row y (as in the earlier 256 test)
             Color Ctrl(Color[] p, int x) => p[ctrlY * W + x];
@@ -118,7 +120,7 @@ public static class ParamroomShaderTest
             // phase 1: all packets, each held for Hold steps, then settle
             var sw = System.Diagnostics.Stopwatch.StartNew();
             for (int k = 0; k < nPackets; k++) { SetPacket(k); for (int h = 0; h < Hold; h++) Step(); }
-            var probe = new Texture2D(1, 1, TextureFormat.RGBAHalf, false);
+            var probe = new Texture2D(1, 1, TextureFormat.RGBA32, false);
             void Sync() { RenderTexture.active = rtA; probe.ReadPixels(new Rect(0, 0, 1, 1), 0, 0); probe.Apply(); RenderTexture.active = null; }
             Sync(); sw.Stop();
             long feedMs = sw.ElapsedMilliseconds;

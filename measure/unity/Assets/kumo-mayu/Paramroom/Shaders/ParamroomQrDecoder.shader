@@ -13,7 +13,8 @@
 //
 // Epoch 0 is ignored (transient all-zero parameters). A new non-zero epoch clears the grid.
 //
-// State atlas (RGBAHalf, double buffered: this pass reads _Src = the other buffer), M = _MaxSide (57 = version 10):
+// State atlas (ARGB32, double buffered: this pass reads _Src = the other buffer), M = _MaxSide (57 = version 10).
+// Values are kept as they are (0..255, cells 0/1); the texture holds them divided by 255 (docs/research/11).
 //   size 64 x (M + 1)
 //   cells     y [0, M)   x [0, M)   r = 1 black, 0 white (a cell whose packet has not arrived stays white, so a
 //                                   reader says "unreadable" rather than reading it wrong)
@@ -96,7 +97,9 @@ Shader "Paramroom/QrDecoder"
                 }
                 return v;
             }
-            float4 Load(uint x, uint y) { return _Src.Load(int3(x, y, 0)); }
+            // アトラスは ARGB32。中の値（0..255、マスは 0/1）はそのまま扱い、読むときに 255 倍、
+            // 書くときに 255 で割る（docs/research/11）
+            float4 Load(uint x, uint y) { return _Src.Load(int3(x, y, 0)) * 255.0; }
 
             // Torn packets (docs/research/10): VRChat can apply half an OSC bundle in one frame, so a packet may be
             // read as "front half new, back half old". Written to the grid it shows as a band of wrong cells until that
@@ -143,7 +146,7 @@ Shader "Paramroom/QrDecoder"
                 return u == 0 || u == 6 || v == 0 || v == 6 || (u >= 2 && u <= 4 && v >= 2 && v <= 4);
             }
 
-            float4 frag (v2f i) : SV_Target
+            float4 Body (v2f i)
             {
                 uint px = (uint)i.pos.x, py = (uint)i.pos.y;
                 LoadPacket();
@@ -186,6 +189,8 @@ Shader "Paramroom/QrDecoder"
                 uint bit = PacketBits(2 + unitBits + (id == 0 ? HEAD : 0) + off, 1);
                 return float4(bit, 0, 0, 1);
             }
+
+            float4 frag (v2f i) : SV_Target { return Body(i) / 255.0; }
             ENDCG
         }
     }

@@ -30,7 +30,7 @@ Shader "Paramroom/Display"
                 // (control texel x4; 0 = 1:1) shrinks the quad's short side, the long side keeps the quad size
                 uint C = (uint)_Canvas;
                 uint ctrlY = C + ((uint)_StoreTexels + 2 * C - 1) / (2 * C) + 8;
-                uint code = (uint)round(_Atlas.Load(int3(4, ctrlY, 0)).r);
+                uint code = (uint)round(_Atlas.Load(int3(4, ctrlY, 0)).r * 255.0);   // ARGB32: 0..255 を 255 で割って入れてある
                 float aspect = code == 0 ? 1 : pow(2, (code - 1) / 254.0 * 4 - 2);
                 v.vertex.xy *= aspect >= 1 ? float2(1, 1 / aspect) : float2(aspect, 1);
                 v2f o; o.pos = UnityObjectToClipPos(v.vertex); o.uv = v.uv; return o;
@@ -40,7 +40,7 @@ Shader "Paramroom/Display"
                 uint C = (uint)_Canvas;
                 uint x = min(C - 1, (uint)(i.uv.x * C));
                 uint y = min(C - 1, (uint)((1 - i.uv.y) * C)); // canvas row 0 = top
-                float3 c = _Atlas.Load(int3(C + x, y, 0)).rgb / 255.0;
+                float3 c = _Atlas.Load(int3(C + x, y, 0)).rgb;      // ARGB32: すでに 0..1
                 return fixed4(GammaToLinearSpace(saturate(c)), 1);
             }
             ENDCG

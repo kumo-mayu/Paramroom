@@ -28,13 +28,13 @@ Shader "Paramroom/QrDisplay"
             fixed4 frag (v2f i) : SV_Target
             {
                 uint M = (uint)_MaxSide, quiet = (uint)_Quiet;
-                uint version = (uint)round(_Atlas.Load(int3(1, M, 0)).r);
+                uint version = (uint)round(_Atlas.Load(int3(1, M, 0)).r * 255.0);   // ARGB32: 255 で割って入れてある
                 if (version == 0) return fixed4(GammaToLinearSpace(float3(1, 1, 1)), 1);   // nothing received yet
                 uint n = 17 + 4 * version, side = n + 2 * quiet;
                 int x = (int)(i.uv.x * side) - (int)quiet;
                 int y = (int)((1 - i.uv.y) * side) - (int)quiet;                           // row 0 = top
                 float c = 1;
-                if (x >= 0 && y >= 0 && x < (int)n && y < (int)n) c = 1 - _Atlas.Load(int3(x, y, 0)).r;
+                if (x >= 0 && y >= 0 && x < (int)n && y < (int)n) c = 1 - _Atlas.Load(int3(x, y, 0)).r * 255.0;
                 return fixed4(GammaToLinearSpace(saturate(float3(c, c, c))), 1);
             }
             ENDCG

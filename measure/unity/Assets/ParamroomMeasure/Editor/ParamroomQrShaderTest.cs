@@ -42,7 +42,7 @@ public static class ParamroomQrShaderTest
 
             var shader = Shader.Find("Paramroom/QrDecoder");
             if (shader == null) throw new Exception("Paramroom/QrDecoder shader missing");
-            RenderTexture MakeAtlas() { var d = new RenderTextureDescriptor(W, H, RenderTextureFormat.ARGBHalf, 0) { sRGB = false }; var rt = new RenderTexture(d) { filterMode = FilterMode.Point }; rt.Create(); return rt; }
+            RenderTexture MakeAtlas() { var d = new RenderTextureDescriptor(W, H, RenderTextureFormat.ARGB32, 0) { sRGB = false }; var rt = new RenderTexture(d) { filterMode = FilterMode.Point }; rt.Create(); return rt; }
             var rtA = MakeAtlas(); var rtB = MakeAtlas();
             var quadMesh = Resources.GetBuiltinResource<Mesh>("Quad.fbx");
             Material matA = new Material(shader), matB = new Material(shader);
@@ -83,9 +83,11 @@ public static class ParamroomQrShaderTest
             void Step() { camA.Render(); camB.Render(); }
             Color[] ReadAtlas()
             {
-                var tex = new Texture2D(W, H, TextureFormat.RGBAHalf, false);
+                var tex = new Texture2D(W, H, TextureFormat.RGBA32, false);
                 RenderTexture.active = rtA; tex.ReadPixels(new Rect(0, 0, W, H), 0, 0); tex.Apply(); RenderTexture.active = null;
-                var p = tex.GetPixels(); UnityEngine.Object.DestroyImmediate(tex); return p;
+                var p = tex.GetPixels(); UnityEngine.Object.DestroyImmediate(tex);
+                for (int i = 0; i < p.Length; i++) p[i] *= 255;   // ARGB32: 0..1 で入っているので 0..255 に戻す
+                return p;
             }
             bool Black(Color[] p, int x, int y) => p[y * W + x].r > 0.5f;
 

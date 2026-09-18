@@ -154,11 +154,27 @@ public sealed class ParamroomSession : IAsyncDisposable
         return ToPreview(Img.FromRgbBytes(QrRenderer.Render(R, L, all), R, R), Aspect.Code(1, 1));
     }
 
+    // 元画像は形式を変えたときに作り直せるよう保持するが、1 画素 24 バイトなので 4000x3000 の写真だと
+    // それだけで 288 MB になる（docs/research/11）。キャンバスは最大 1024 なので、長辺 2048 まで縮めて
+    // 持てば十分。2048 以下の画像は触らない。
+    //   実測: 4:3 なら縮小を 2 段にしても結果は完全に同一、それ以外の比でも差は最大 2 階調・平均 0.03 階調
+    public const int SourceLongSide = 2048;
+
+    public static Img LimitForMemory(Img image)
+    {
+        int longSide = Math.Max(image.W, image.H);
+        if (longSide <= SourceLongSide) return image;
+        double s = (double)SourceLongSide / longSide;
+        return image.Resize(Math.Max(1, (int)Math.Round(image.W * s)), Math.Max(1, (int)Math.Round(image.H * s)));
+    }
+
     public void SetSource(Img image, string name)
     {
+        int w = image.W, h = image.H;          // 画面には元の大きさを出す
+        image = LimitForMemory(image);
         lock (gate) { sourceImage = image; qrText = null; }
-        var preview = ToPreview(image, Aspect.Code(image.W, image.H));
-        Update(s => s with { Source = new SourceInfo(name, image.W, image.H, preview) });
+        var preview = ToPreview(image, Aspect.Code(w, h));
+        Update(s => s with { Source = new SourceInfo(name, w, h, preview) });
         StartEncode();
     }
 

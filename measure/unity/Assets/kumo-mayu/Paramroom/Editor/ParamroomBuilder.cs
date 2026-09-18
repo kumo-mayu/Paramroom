@@ -128,7 +128,7 @@ public static class ParamroomBuilder
             // store rows: the same ceiling the shader uses (InitLayout: STORE_ROWS = ceil(_StoreTexels / ATLAS_W)).
             // Rounding down here would put the control row outside the texture whenever the two disagree.
             int storeRows = (storeTexels + 2 * canvas - 1) / (2 * canvas);
-            var d = new RenderTextureDescriptor(2 * canvas, canvas + storeRows + 16, RenderTextureFormat.ARGBHalf, 0) { sRGB = false, msaaSamples = 1, useMipMap = false, autoGenerateMips = false };
+            var d = new RenderTextureDescriptor(2 * canvas, canvas + storeRows + 16, RenderTextureFormat.ARGB32, 0) { sRGB = false, msaaSamples = 1, useMipMap = false, autoGenerateMips = false };
             return Save(new RenderTexture(d) { name = name, filterMode = FilterMode.Point, wrapMode = TextureWrapMode.Clamp }, name + ".renderTexture");
         }
         var rtA = Atlas("ParamroomAtlasA" + suffix);
@@ -287,7 +287,7 @@ public static class ParamroomBuilder
         float farA = QrFar, farB = farA + 0.0002f;
         RenderTexture Atlas(string name)
         {
-            var d = new RenderTextureDescriptor(QrAtlasW, QrMaxSide + 1, RenderTextureFormat.ARGBHalf, 0) { sRGB = false, msaaSamples = 1, useMipMap = false, autoGenerateMips = false };
+            var d = new RenderTextureDescriptor(QrAtlasW, QrMaxSide + 1, RenderTextureFormat.ARGB32, 0) { sRGB = false, msaaSamples = 1, useMipMap = false, autoGenerateMips = false };
             return Save(new RenderTexture(d) { name = name, filterMode = FilterMode.Point, wrapMode = TextureWrapMode.Clamp }, name + ".renderTexture");
         }
         var rtA = Atlas("ParamroomQrAtlasA_" + bytes);

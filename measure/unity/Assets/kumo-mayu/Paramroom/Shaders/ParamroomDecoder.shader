@@ -14,13 +14,15 @@
 //   The mode is the bit just before the aspect byte in every packet, and is accepted the same way (two passes agreeing).
 // Epoch 0 is ignored (transient all-zero parameters). A new non-zero epoch clears the state.
 //
-// State atlas (RGBAHalf, double buffered: this pass reads _Src = the other buffer). C = _Canvas (256 or 512):
+// State atlas (ARGB32, double buffered: this pass reads _Src = the other buffer). Values are 0..255 throughout;
+// the texture holds them divided by 255, so Load multiplies back and frag divides (docs/research/11).
+// C = _Canvas (256 or 512):
 //   S = store rows = ceil(_StoreTexels / 2C) (2 texels per primitive; 8192 texels = 4096 primitives by default)
 //   size 2C x (C + S + 16): C=256 -> 512 x 288, C=512 -> 1024 x 536 (5000 primitives: 1024 x 538)
 //   work canvas     x [0,C)   y [0,C)   canvas being redrawn, _BatchSize primitives per pass
 //   display canvas  x [C,2C)  y [0,C)   last completed canvas (what the board shows)
 //   primitive store y [C, C+S)      texel index t = 2*j + h (h = 0/1): bytes of primitive j's bit field
-//                   (4 bytes per texel, value 0..255 exact in half); present flag = byte 7 bit 0; <= 4096 primitives
+//                   (4 bytes per texel, a byte per channel is exact in 8 bit); present flag = byte 7 bit 0; <= 4096 primitives
 //   control         y = CTRL = C + S + 8: x0 = batch counter s, x1 = epoch, x2 = bg present,
 //                   x3 = bg RGB 0..255, x4 = accepted aspect code, x5 = aspect code of the previous valid packet,
 //                   x6 = dirty (the store changed since the running/last redraw started),
@@ -143,7 +145,9 @@ Shader "Paramroom/Decoder"
                 }
                 return v;
             }
-            float4 Load(uint x, uint y) { return _Src.Load(int3(x, y, 0)); }
+            // アトラスは ARGB32（4 バイト/テクセル）。中の値は 0..255 のまま扱い、読むときに 255 倍、
+            // 書くときに 255 で割る（docs/research/11）。置き場のバイトは 8 bit にそのまま入るので丸めは起きない。
+            float4 Load(uint x, uint y) { return _Src.Load(int3(x, y, 0)) * 255.0; }
 
             // Torn packets (docs/research/10). VRChat sometimes applies only part of an OSC bundle in a frame, so a
             // packet can be read as "front half new, back half old" (measured 0.3% with bundles). Written to the store
@@ -278,7 +282,7 @@ Shader "Paramroom/Decoder"
                 return false;
             }
 
-            float4 frag (v2f i) : SV_Target
+            float4 Body (v2f i)
             {
                 uint px = (uint)i.pos.x, py = (uint)i.pos.y;
                 InitLayout();
@@ -412,6 +416,8 @@ Shader "Paramroom/Decoder"
                 }
                 return float4(0, 0, 0, 1);
             }
+
+            float4 frag (v2f i) : SV_Target { return Body(i) / 255.0; }
             ENDCG
         }
     }
