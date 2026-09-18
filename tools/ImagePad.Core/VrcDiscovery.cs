@@ -36,6 +36,9 @@ public static class DecoderFormat
         [3] = new(512, 4000, 9, 8, 6, C565, 2, "ImagePadPrimDecoder512", "512px・図形 4000 個"),
         [4] = new(512, 4000, 8, 6, 5, C444, 2, "ImagePadPrimDecoder512Light", "512px・図形 4000 個（軽量）"),
         [5] = new(512, 5000, 8, 6, 5, C444, 2, "ImagePadPrimDecoder512Light5000", "512px・図形 5000 個（軽量）"),
+        // 1024 canvas: the coordinates take 10 bits and the angle 5, so the primitive stays at 59 bits and the packet
+        // keeps 8 spare bits for the aspect code (docs/research/08 §17). Built to measure the GPU cost in VRChat.
+        [6] = new(1024, 4000, 10, 8, 5, C565, 2, "ImagePadPrimDecoder1024", "1024px・図形 4000 個"),
     };
 
     // what is assumed when the avatar does not tell (prefabs before ImagePad_Format)

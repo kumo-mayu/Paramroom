@@ -45,6 +45,10 @@ public static class ImagePadPrimBuilder
         [3] = new Format { canvas = 512, prims = 4000, cb = 9, rb = 8, ab = 6, cr = 5, cg = 6, cbl = 5, abits = 2, name = "512/4000", prefab = "ImagePadPrimDecoder512", far = 0.0247f },
         [4] = new Format { canvas = 512, prims = 4000, cb = 8, rb = 6, ab = 5, cr = 4, cg = 4, cbl = 4, abits = 2, name = "512/4000 軽量", prefab = "ImagePadPrimDecoder512Light", far = 0.0267f },
         [5] = new Format { canvas = 512, prims = 5000, cb = 8, rb = 6, ab = 5, cr = 4, cg = 4, cbl = 4, abits = 2, name = "512/5000 軽量", prefab = "ImagePadPrimDecoder512Light5000", far = 0.0277f },
+        // 1024 canvas (docs/research/08 §17): coordinates need 10 bits, so the angle drops to 5 to keep the primitive at
+        // 59 bits and leave the packet 8 spare bits for the aspect code. Made to measure the GPU cost in VRChat: the
+        // decoder quad is 2048x1044 instead of 1024x536, so one pass costs about 4x what it does at 512.
+        [6] = new Format { canvas = 1024, prims = 4000, cb = 10, rb = 8, ab = 5, cr = 5, cg = 6, cbl = 5, abits = 2, name = "1024/4000（負荷測定用）", prefab = "ImagePadPrimDecoder1024", far = 0.0287f },
     };
 
     // ---- layout (same as sim/codecs/prim.js layout / tools/ImagePad.Core PrimLayout)

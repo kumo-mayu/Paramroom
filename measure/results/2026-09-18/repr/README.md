@@ -16,3 +16,8 @@ n 個届いた状態」を描いたもの。1 パケット 100 ms なので 20 �
 - `screenshot_wikipedia-text.png` / `screenshot_mahara-text.png`: 本文の段落を**等倍**で切り出した比較。
   現行(base)・ぼかし+探索強化(deepsoft)・カプセル(cap)・カプセル+探索強化(capdeep)・
   種別bit+ぼかし+探索強化(mixsoftdeep)。カプセル系は文字の輪郭が明確に鮮明になる
+
+## 512 と 1024 の比較（docs/research/08 §17）
+
+- `screenshot_wikipedia-1024.png`: 切り出し画像（480x480）の場合。**512 のほうが読める**
+- `screenshot_mahara_full-1024.png`: ページ全体（960x847）を送る場合。1024 が効くのはこちら
