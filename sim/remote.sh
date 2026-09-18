@@ -7,7 +7,7 @@
 #   bash remote.sh run <jobs file>      # run the jobs there (one per line, e.g. "shape-eval.js encode kodim23 rf")
 #   bash remote.sh fetch <glob>         # copy cache files back, e.g. 'cache/shape/*-rf4.json'
 set -e
-HOST=${PARAMROOM_REMOTE:-kaito@192.168.2.100}
+HOST=${PARAMROOM_REMOTE:?PARAMROOM_REMOTE=<user>@<host> を指定してください（2 台目の PC。SSH 公開鍵を置いておく）}
 RDIR=${PARAMROOM_REMOTE_DIR:-C:/paramroom-sim}
 RDIRW=${RDIR//\//\\}   # the same path with backslashes, which is what cmd.exe wants
 WORKERS=${PARAMROOM_REMOTE_WORKERS:-16}

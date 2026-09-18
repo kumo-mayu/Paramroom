@@ -36,8 +36,10 @@ Microsoft.NET.Test.Sdk（MIT）。
 - **Wikimedia Commons** の画像 — CC0 / CC BY 3.0 / CC BY 4.0 / CC BY-SA 3.0 / パブリックドメイン。
   ファイルごとの作者・ライセンスは `SOURCES.txt` を参照
 - **CC BY-SA の画像を含みます**（Wikipe-tan, Girl in chibi style など）。
-  `measure/results/` の比較画像はこれらから作った派生物なので、再配布する場合は
-  `SOURCES.txt` の帰属表示を一緒に持っていってください
+  `measure/results/` と `sim/results/` の比較画像のうち、これらを元にしたものは
+  **派生物なので MIT ではなく元の CC BY-SA 3.0 が及びます**。再配布する場合は
+  同じ条件で、`SOURCES.txt` の帰属表示を一緒に持っていってください。
+  **ソフトウェア（`tools/`・`measure/unity/Assets/`・`sim/` のコード）は MIT だけです**
 
 ## 参考にしたもの（コードは使っていない）
 
