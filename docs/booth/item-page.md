@@ -244,6 +244,10 @@ MIT ライセンスです（同梱の LICENSE）。
 キプフェル Kipfel / オリジナル3Dモデル
 https://booth.pm/ja/items/5813187
 ©もち山金魚
+
+ミルフィ Milfy / オリジナル3Dモデル
+https://booth.pm/ja/items/6571299
+©有坂みと
 ```
 
 ## 動作確認環境(2026-9月 時点)
@@ -300,3 +304,8 @@ https://booth.pm/ja/items/5813187
   クレジットは「不要ですがあると嬉しいです」。個人は営利・非営利を問わず利用可、記念写真等の
   Web 投稿も許可（個別条件 2(1)）
   https://mochiyama.com/license_jp
+- ミルフィのクレジット：ユーザーの水底シェーダーの商品ページ（https://kumo-mayu.booth.pm/items/8539791）
+  と同じ表記。送信の例に使った水底シェーダーのサムネイルに写っている
+- 途中の絵（5・10・15・20・50・80 秒）：`sim/progress-frames.js` で描いた。C# CLI の形式 4 の符号化、
+  既定の送り方 fast+sqrt/8、100 ms、実測に合わせた経路（meas60）、送信開始から見ている人。
+  完成との MS-SSIM は 80 秒で 0.997〜0.998。**全部揃うのは取りこぼしなしでも 92 秒**（`sim/complete-time.js`）
