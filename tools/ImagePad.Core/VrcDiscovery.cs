@@ -50,14 +50,14 @@ public static class DecoderFormat
 
     public static readonly Dictionary<int, DecoderFormatInfo> Known = new()
     {
-        [1] = new(256, 1000, 9, 8, 6, C565, 2, "ImagePadPrimDecoder", "256px・図形 1000 個"),
-        [2] = new(512, 2000, 9, 8, 6, C565, 2, "ImagePadPrimDecoder512n2000", "512px・図形 2000 個"),
-        [3] = new(512, 4000, 9, 8, 6, C565, 2, "ImagePadPrimDecoder512", "512px・図形 4000 個"),
-        [4] = new(512, 4000, 8, 6, 5, C444, 2, "ImagePadPrimDecoder512Light", "512px・図形 4000 個（軽量）"),
-        [5] = new(512, 5000, 8, 6, 5, C444, 2, "ImagePadPrimDecoder512Light5000", "512px・図形 5000 個（軽量）"),
+        [1] = new(256, 1000, 9, 8, 6, C565, 2, "ParamroomDecoder256", "256px・図形 1000 個"),
+        [2] = new(512, 2000, 9, 8, 6, C565, 2, "ParamroomDecoder512n2000", "512px・図形 2000 個"),
+        [3] = new(512, 4000, 9, 8, 6, C565, 2, "ParamroomDecoder512", "512px・図形 4000 個"),
+        [4] = new(512, 4000, 8, 6, 5, C444, 2, "ParamroomDecoder512Light", "512px・図形 4000 個（軽量）"),
+        [5] = new(512, 5000, 8, 6, 5, C444, 2, "ParamroomDecoder512Light5000", "512px・図形 5000 個（軽量）"),
         // 1024 canvas: the coordinates take 10 bits and the angle 5, so the primitive stays at 59 bits and the packet
         // keeps 8 spare bits for the aspect code (docs/research/08 §17). Built to measure the GPU cost in VRChat.
-        [6] = new(1024, 4000, 10, 8, 5, C565, 2, "ImagePadPrimDecoder1024", "1024px・図形 4000 個（実験用）"),
+        [6] = new(1024, 4000, 10, 8, 5, C565, 2, "ParamroomDecoder1024", "1024px・図形 4000 個（実験用）"),
     };
 
     // what is assumed when the avatar does not tell (prefabs before ImagePad_Format)
@@ -70,9 +70,10 @@ public static class DecoderFormat
 // nothing in the 256 bit budget.
 public static class ParamNames
 {
-    public const string Prefix = "KUMO_ImagePad_";
+    public const string Prefix = "Paramroom_";
     public const string LegacyPrefix = "";
     public static string Data(string prefix, int i) => $"{prefix}D{i}";
+    // the old prefabs called it ImagePad_Format; a prefixed one uses Paramroom_Format
     public static string Format(string prefix) => prefix.Length > 0 ? prefix + "Format" : "ImagePad_Format";
 }
 

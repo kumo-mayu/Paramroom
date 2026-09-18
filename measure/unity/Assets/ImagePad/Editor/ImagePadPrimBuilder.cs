@@ -46,13 +46,13 @@ public static class ImagePadPrimBuilder
     // the sender still supports avatars that have them.
     public static readonly Dictionary<int, Format> Formats = new()
     {
-        [3] = new Format { canvas = 512, prims = 4000, cb = 9, rb = 8, ab = 6, cr = 5, cg = 6, cbl = 5, abits = 2, name = "512/4000", prefab = "ImagePadPrimDecoder512", far = 0.0247f },
-        [4] = new Format { canvas = 512, prims = 4000, cb = 8, rb = 6, ab = 5, cr = 4, cg = 4, cbl = 4, abits = 2, name = "512/4000 軽量", prefab = "ImagePadPrimDecoder512Light", far = 0.0267f },
-        [5] = new Format { canvas = 512, prims = 5000, cb = 8, rb = 6, ab = 5, cr = 4, cg = 4, cbl = 4, abits = 2, name = "512/5000 軽量", prefab = "ImagePadPrimDecoder512Light5000", far = 0.0277f },
+        [3] = new Format { canvas = 512, prims = 4000, cb = 9, rb = 8, ab = 6, cr = 5, cg = 6, cbl = 5, abits = 2, name = "512/4000", prefab = "ParamroomDecoder512", far = 0.0247f },
+        [4] = new Format { canvas = 512, prims = 4000, cb = 8, rb = 6, ab = 5, cr = 4, cg = 4, cbl = 4, abits = 2, name = "512/4000 軽量", prefab = "ParamroomDecoder512Light", far = 0.0267f },
+        [5] = new Format { canvas = 512, prims = 5000, cb = 8, rb = 6, ab = 5, cr = 4, cg = 4, cbl = 4, abits = 2, name = "512/5000 軽量", prefab = "ParamroomDecoder512Light5000", far = 0.0277f },
         // 1024 canvas (docs/research/08 §17): coordinates need 10 bits, so the angle drops to 5 to keep the primitive at
         // 59 bits and leave the packet 8 spare bits for the aspect code. Made to measure the GPU cost in VRChat: the
         // decoder quad is 2048x1044 instead of 1024x536, so one pass costs about 4x what it does at 512.
-        [6] = new Format { canvas = 1024, prims = 4000, cb = 10, rb = 8, ab = 5, cr = 5, cg = 6, cbl = 5, abits = 2, name = "1024/4000（負荷測定用）", prefab = "ImagePadPrimDecoder1024", far = 0.0287f },
+        [6] = new Format { canvas = 1024, prims = 4000, cb = 10, rb = 8, ab = 5, cr = 5, cg = 6, cbl = 5, abits = 2, name = "1024/4000（負荷測定用）", prefab = "ParamroomDecoder1024", far = 0.0287f },
     };
 
     // ---- layout (same as sim/codecs/prim.js layout / tools/ImagePad.Core PrimLayout)
@@ -109,7 +109,7 @@ public static class ImagePadPrimBuilder
         int storeTexels = StoreTexels(fmt, layout);
         float farA = fmt.far, farB = farA + 0.0002f;
         string prefabName = PrefabName(formatId, bytes);
-        string suffix = prefabName.Substring("ImagePadPrimDecoder".Length);
+        string suffix = prefabName.Substring("ParamroomDecoder".Length);
         string Gen = Root + "/GeneratedPrim" + suffix;
         if (!AssetDatabase.IsValidFolder(Gen)) AssetDatabase.CreateFolder(Root, "GeneratedPrim" + suffix);
         T Save<T>(T obj, string name) where T : UnityEngine.Object
@@ -195,7 +195,7 @@ public static class ImagePadPrimBuilder
         {
             var clip = new AnimationClip { name = $"ImagePadPrim_Set_P{i}" };
             foreach (var q in quads) AnimationUtility.SetEditorCurve(clip, EditorCurveBinding.FloatCurve(q, typeof(MeshRenderer), $"material._P{i}"), Const(1));
-            children.Add(new ChildMotion { motion = Save(clip, clip.name + ".anim"), directBlendParameter = ImagePadNames.Data(i), timeScale = 1 });
+            children.Add(new ChildMotion { motion = Save(clip, clip.name + ".anim"), directBlendParameter = ParamroomNames.Data(i), timeScale = 1 });
         }
         var baseClip = new AnimationClip { name = "ImagePadPrim_Base" };
         foreach (var q in quads) for (int i = 0; i < bytes; i++) AnimationUtility.SetEditorCurve(baseClip, EditorCurveBinding.FloatCurve(q, typeof(MeshRenderer), $"material._P{i}"), Const(0));
@@ -205,7 +205,7 @@ public static class ImagePadPrimBuilder
         var ctrlPath = $"{Gen}/ImagePadPrim_FX.controller";
         if (AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(ctrlPath) != null) AssetDatabase.DeleteAsset(ctrlPath);
         var ctrl = AnimatorController.CreateAnimatorControllerAtPath(ctrlPath);
-        for (int i = 0; i < bytes; i++) ctrl.AddParameter(ImagePadNames.Data(i), AnimatorControllerParameterType.Float);
+        for (int i = 0; i < bytes; i++) ctrl.AddParameter(ParamroomNames.Data(i), AnimatorControllerParameterType.Float);
         ctrl.AddParameter(new AnimatorControllerParameter { name = "ImagePadPrim_One", type = AnimatorControllerParameterType.Float, defaultFloat = 1 });
         var tree = new BlendTree { name = "ImagePadPrimDirect", blendType = BlendTreeType.Direct, useAutomaticThresholds = false, hideFlags = HideFlags.HideInHierarchy };
         tree.children = children.ToArray();
@@ -216,7 +216,7 @@ public static class ImagePadPrimBuilder
         var sm = ctrl.layers[0].stateMachine;
         var st = sm.AddState("ImagePadPrimRun");
         st.motion = tree; st.writeDefaultValues = true; sm.defaultState = st;
-        var layers = ctrl.layers; layers[0].name = "ImagePadPrimDecoder"; layers[0].defaultWeight = 1; ctrl.layers = layers;
+        var layers = ctrl.layers; layers[0].name = "Paramroom"; layers[0].defaultWeight = 1; ctrl.layers = layers;
         EditorUtility.SetDirty(ctrl);
 
         ImagePadModularAvatar.AddMergeAnimator(root, ctrl);
@@ -248,7 +248,7 @@ public static class ImagePadPrimBuilder
         }
         int total = Bits(avatarRoot);
         int imagePad = avatarRoot.GetComponentsInChildren<Transform>(true)
-            .Where(tr => tr.name.StartsWith("ImagePadPrimDecoder") && (tr.parent == null || !tr.parent.name.StartsWith("ImagePadPrimDecoder")))
+            .Where(tr => tr.name.StartsWith("ParamroomDecoder") && (tr.parent == null || !tr.parent.name.StartsWith("ParamroomDecoder")))
             .Sum(tr => Bits(tr.gameObject));
         return (total - imagePad, imagePad);
     }

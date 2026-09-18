@@ -6,6 +6,16 @@ using System.Linq;
 using UnityEditor;
 using UnityEngine;
 
+// The avatar parameter names. The prefix keeps them from colliding with other gimmicks ("D0" is a name anyone might
+// use). Parameter names are not synced, so a longer name costs nothing in the 256 bit budget. The sender also accepts
+// the plain D0.. of prefabs built before this, so those avatars keep working.
+public static class ParamroomNames
+{
+    public const string Prefix = "Paramroom_";
+    public static string Data(int i) => $"{Prefix}D{i}";
+    public const string Format = Prefix + "Format";
+}
+
 public static class ImagePadModularAvatar
 {
     internal static Type FindType(string fullName) =>
@@ -57,7 +67,7 @@ public static class ImagePadModularAvatar
         {
             bool format = i == byteCount;
             var el = list.GetArrayElementAtIndex(i);
-            Req(el, "nameOrPrefix").stringValue = format ? ImagePadNames.Format : ImagePadNames.Data(i);
+            Req(el, "nameOrPrefix").stringValue = format ? ParamroomNames.Format : ParamroomNames.Data(i);
             Req(el, "remapTo").stringValue = "";
             Req(el, "internalParameter").boolValue = false;
             Req(el, "isPrefix").boolValue = false;
