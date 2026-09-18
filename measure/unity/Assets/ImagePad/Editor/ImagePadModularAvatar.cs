@@ -57,7 +57,7 @@ public static class ImagePadModularAvatar
         {
             bool format = i == byteCount;
             var el = list.GetArrayElementAtIndex(i);
-            Req(el, "nameOrPrefix").stringValue = format ? "ImagePad_Format" : $"D{i}";
+            Req(el, "nameOrPrefix").stringValue = format ? ImagePadNames.Format : ImagePadNames.Data(i);
             Req(el, "remapTo").stringValue = "";
             Req(el, "internalParameter").boolValue = false;
             Req(el, "isPrefix").boolValue = false;

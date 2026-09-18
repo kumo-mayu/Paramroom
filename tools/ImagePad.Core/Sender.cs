@@ -86,28 +86,28 @@ public static class OscSender
     static void Str(List<byte> b, string s) { b.AddRange(Encoding.ASCII.GetBytes(s)); b.Add(0); while (b.Count % 4 != 0) b.Add(0); }
     static void Int(List<byte> b, int v) { b.Add((byte)(v >> 24)); b.Add((byte)(v >> 16)); b.Add((byte)(v >> 8)); b.Add((byte)v); }
 
-    // one OSC bundle with /avatar/parameters/D0..D(n-1) ,i
-    public static byte[] Bundle(byte[] packet)
+    // one OSC bundle with the avatar's Int parameters (prefixed, or the plain D0..D(n-1) of older avatars)
+    public static byte[] Bundle(byte[] packet, string prefix = "")
     {
         var b = new List<byte>(1400);
         Str(b, "#bundle"); b.AddRange(new byte[] { 0, 0, 0, 0, 0, 0, 0, 1 });
         for (int i = 0; i < packet.Length; i++)
         {
             var m = new List<byte>(40);
-            Str(m, $"/avatar/parameters/D{i}"); Str(m, ",i"); Int(m, packet[i]);
+            Str(m, $"/avatar/parameters/{ParamNames.Data(prefix, i)}"); Str(m, ",i"); Int(m, packet[i]);
             Int(b, m.Count); b.AddRange(m);
         }
         return b.ToArray();
     }
 
-    public static void Run(byte[][] packets, Func<int, int> schedule, string host, int port, double holdMs, double durationSec, bool bundle)
+    public static void Run(byte[][] packets, Func<int, int> schedule, string host, int port, double holdMs, double durationSec, bool bundle, string prefix = "")
     {
         using var udp = new UdpClient();
         udp.Connect(host, port);
-        var bundles = packets.Select(Bundle).ToArray();
+        var bundles = packets.Select(p => Bundle(p, prefix)).ToArray();
         var singles = bundle ? null : packets.Select(p => Enumerable.Range(0, p.Length).Select(i =>
         {
-            var m = new List<byte>(); Str(m, $"/avatar/parameters/D{i}"); Str(m, ",i"); Int(m, p[i]); return m.ToArray();
+            var m = new List<byte>(); Str(m, $"/avatar/parameters/{ParamNames.Data(prefix, i)}"); Str(m, ",i"); Int(m, p[i]); return m.ToArray();
         }).ToArray()).ToArray();
         bool stop = false;
         Console.CancelKeyPress += (_, e) => { e.Cancel = true; stop = true; };

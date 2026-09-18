@@ -4,7 +4,7 @@
 //                           [--client <name part | OSC port>] [--wait 3] [--R 512 --n 4000] [--force] [--seed N]
 //                           [--host 127.0.0.1 --port 9000] [--no-bundle]
 //   imagepad send   --units units.json [...]                  (send a previously encoded image)
-//   imagepad encode <image> [--R 512 --n 4000 | --format 3..6] [--fit ...] [--out units.json] [--png canvas.png]
+//   imagepad encode <image> [--R 512 --n 4000 | --format 3..6] [--fit ...] [--refine 3] [--out units.json] [--png canvas.png]
 //   imagepad list                                             (VRChat clients found with OSCQuery)
 //
 // Destination: by default the VRChat client is found with OSCQuery (vrc-oscquery-lib): the client whose current avatar
@@ -36,6 +36,7 @@ if (argv.Count == 0 || (argv[0] != "send" && argv[0] != "encode" && argv[0] != "
     return 1;
 }
 string cmd = argv[0];
+string paramPrefix = "";   // the avatar's parameter names (prefixed, or the plain D0.. of avatars built earlier)
 string? Opt(string name) { int i = argv.IndexOf("--" + name); return i >= 0 && i + 1 < argv.Count ? argv[i + 1] : null; }
 double Num(string name, double d) => Opt(name) is string s ? double.Parse(s, CultureInfo.InvariantCulture) : d;
 bool Flag(string name) => argv.Contains("--" + name);
@@ -63,7 +64,7 @@ if (cmd == "send")
             Console.WriteLine(sel.Count == 0 ? "no VRChat client with the ImagePad Int parameters D0.. found (use --client or --port)" : "several VRChat clients match: choose one with --client <name part | OSC port>");
             return 2;
         }
-        host = sel[0].OscIp; port = sel[0].OscPort; format = sel[0].Format; avatarBytes = sel[0].ImagePadParams;
+        host = sel[0].OscIp; port = sel[0].OscPort; format = sel[0].Format; avatarBytes = sel[0].ImagePadParams; paramPrefix = sel[0].ParamPrefix;
         Console.WriteLine($"-> sending to {sel[0].Name}");
     }
 }
@@ -128,6 +129,11 @@ else
     if (Opt("cb") is string ocb) cfg.Cb = int.Parse(ocb);
     if (Opt("rb") is string orb) cfg.Rb = int.Parse(orb);
     if (Opt("ab") is string oab) cfg.Ab = int.Parse(oab);
+    // docs/research/08 §15: re-fit the primitives afterwards (encoder only, the packets are unchanged)
+    if (Opt("refine") is string orf) cfg.RefineSweeps = int.Parse(orf);
+    if (Opt("refine-iters") is string ori) cfg.RefineIters = int.Parse(ori);
+    if (Opt("batch") is string obp) cfg.BatchPlace = int.Parse(obp);
+    if (Opt("nclimb") is string onc) cfg.NClimb = int.Parse(onc);
     if (Opt("abits") is string oal) cfg.ABits = int.Parse(oal);
     if (Opt("col") is string ocol) cfg.Col = ocol.Split(',').Select(int.Parse).ToArray();
     if (Opt("seed") is string seed) cfg.Seed = uint.Parse(seed);
@@ -172,6 +178,6 @@ if (cmd == "send")
     string sched = Opt("schedule") ?? "fast+sqrt/8"; // default chosen from measure/results/2026-09-17/fastfirst (2026-09-17)
     if (Schedules.Create(sched, gains) is not { } schedule) { Console.WriteLine($"unknown schedule {sched}"); return 2; }
     Console.WriteLine($"aspect code {aspect} (w/h {Aspect.Ratio(aspect):F3}); sending {packets.Length} units x {nBytes} Int to {host}:{port}: epoch {epoch}, schedule {sched}, hold {hold} ms, {(bundle ? "OSC bundle" : "single messages")}. Ctrl+C to stop.");
-    OscSender.Run(packets, schedule, host, port, hold, duration, bundle);
+    OscSender.Run(packets, schedule, host, port, hold, duration, bundle, paramPrefix);
 }
 return 0;

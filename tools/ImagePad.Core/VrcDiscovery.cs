@@ -6,7 +6,8 @@ using VRC.OSCQuery;
 
 namespace ImagePad;
 
-public sealed record VrcClient(string Name, string OscIp, int OscPort, string? AvatarId, int ImagePadParams, int? Format, string? Problem)
+public sealed record VrcClient(string Name, string OscIp, int OscPort, string? AvatarId, int ImagePadParams, int? Format, string? Problem,
+    string? QueryIp = null, int QueryPort = 0, string ParamPrefix = "")
 {
     public override string ToString() => $"{Name}: OSC {OscIp}:{OscPort}, avatar {AvatarId}, ImagePad Int params {(ImagePadParams > 0 ? $"{ImagePadParams} (D0..D{ImagePadParams - 1})" : "0")}, format {(Format?.ToString() ?? "-")}{(Problem != null ? " (" + Problem + ")" : "")}";
 }
@@ -63,6 +64,18 @@ public static class DecoderFormat
     public static DecoderFormatInfo Default => Known[3];
 }
 
+// The avatar parameters this tool drives. The prefix keeps them from colliding with other gimmicks (plain "D0" is a
+// name anyone might use). Avatars built before the prefix existed have the plain names, so both are accepted: a client
+// reports which set it has and the sender uses that one. Parameter names are not synced, so the longer name costs
+// nothing in the 256 bit budget.
+public static class ParamNames
+{
+    public const string Prefix = "KUMO_ImagePad_";
+    public const string LegacyPrefix = "";
+    public static string Data(string prefix, int i) => $"{prefix}D{i}";
+    public static string Format(string prefix) => prefix.Length > 0 ? prefix + "Format" : "ImagePad_Format";
+}
+
 public static class VrcDiscovery
 {
     public const int MaxParams = 32;
@@ -90,6 +103,17 @@ public static class VrcDiscovery
         lock (found) profiles = found.Values.ToList();
         foreach (var p in profiles)
         {
+            clients.Add(await InspectAsync(p.name, p.address, p.port));
+        }
+        return clients.OrderBy(c => c.OscPort).ToList();
+    }
+
+    // Ask one VRChat client what it has now. This is a plain HTTP request to its OSCQuery service, so it can be repeated
+    // while sending (the avatar may be swapped) without the mDNS sweep FindAsync does.
+    public static async Task<VrcClient> InspectAsync(string name, System.Net.IPAddress address, int port)
+    {
+        {
+            var p = new { name, address, port };
             try
             {
                 var host = await Extensions.GetHostInfo(p.address, p.port);
@@ -97,23 +121,32 @@ public static class VrcDiscovery
                 string? avatar = tree.GetNodeWithPath("/avatar/change")?.Value?.FirstOrDefault()?.ToString();
                 if (Environment.GetEnvironmentVariable("IMAGEPAD_DEBUG") == "1")
                     Console.WriteLine($"  [debug] {p.name} D0 value: {string.Join(",", tree.GetNodeWithPath("/avatar/parameters/D0")?.Value ?? Array.Empty<object>())}");
-                // ImagePad Int parameters: consecutive D0, D1, ... of type i (the prefab defines D0..D(B-1))
+                // consecutive Int parameters, with the prefix if the avatar has it and the old plain names otherwise
                 int ok = 0; string? problem = null;
+                string prefix = tree.GetNodeWithPath($"/avatar/parameters/{ParamNames.Data(ParamNames.Prefix, 0)}") != null
+                    ? ParamNames.Prefix : ParamNames.LegacyPrefix;
                 for (int i = 0; i < MaxParams; i++)
                 {
-                    var node = tree.GetNodeWithPath($"/avatar/parameters/D{i}");
-                    if (node == null) { if (i == 0) problem = "D0 missing"; break; }
-                    if (node.OscType != "i") { problem = $"D{i} type {node.OscType} (expected i)"; break; }
+                    string param = ParamNames.Data(prefix, i);
+                    var node = tree.GetNodeWithPath($"/avatar/parameters/{param}");
+                    if (node == null) { if (i == 0) problem = $"{param} missing"; break; }
+                    if (node.OscType != "i") { problem = $"{param} type {node.OscType} (expected i)"; break; }
                     ok++;
                 }
                 int? format = null;
-                var fnode = tree.GetNodeWithPath("/avatar/parameters/ImagePad_Format");
+                var fnode = tree.GetNodeWithPath($"/avatar/parameters/{ParamNames.Format(prefix)}");
                 if (fnode?.Value is { Length: > 0 } fv && double.TryParse(fv[0]?.ToString(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var fd)) format = (int)Math.Round(fd);
                 string ip = string.IsNullOrEmpty(host.oscIP) || host.oscIP == "0.0.0.0" ? p.address.ToString() : host.oscIP;
-                clients.Add(new VrcClient(p.name, ip, host.oscPort, avatar, ok, format, problem));
+                return new VrcClient(p.name, ip, host.oscPort, avatar, ok, format, problem, p.address.ToString(), p.port, prefix);
             }
-            catch (Exception e) { clients.Add(new VrcClient(p.name, p.address.ToString(), 0, null, 0, null, "query failed: " + e.Message)); }
+            catch (Exception e) { return new VrcClient(p.name, p.address.ToString(), 0, null, 0, null, "query failed: " + e.Message, p.address.ToString(), p.port); }
         }
-        return clients.OrderBy(c => c.OscPort).ToList();
+    }
+
+    // The same client as before, as it is now (null when it never had an OSCQuery address, e.g. a fixed --port target)
+    public static async Task<VrcClient?> RecheckAsync(VrcClient c)
+    {
+        if (c.QueryIp is null || c.QueryPort == 0 || !System.Net.IPAddress.TryParse(c.QueryIp, out var addr)) return null;
+        return await InspectAsync(c.Name, addr, c.QueryPort);
     }
 }

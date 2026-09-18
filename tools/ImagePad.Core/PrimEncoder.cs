@@ -28,7 +28,21 @@ public sealed class PrimConfig
     public int LayoutPrims = 0;
     public int[] Col = { 5, 6, 5 };
     public double StopFrac = 2e-5;
-    public int NRand = 200, NClimb = 4, MaxAge = 100, MaxIter = 600;
+    public int NRand = 200, NClimb = 16, MaxAge = 100, MaxIter = 600;
+    // Primitives accepted per round when their bounding boxes do not overlap (1 = one at a time, the plain greedy).
+    // Disjoint shapes score independently, so this places the same shapes with fewer sequential rounds and uses the
+    // threads the climbs leave idle. Measured on kodim05 at 512/4000 (16 threads): 4 per round with 16 climbs takes
+    // 1.14 s against 1.89 s one at a time with 4 climbs, and the picture is the same (0.9476 vs 0.9473) - the wider
+    // search makes up for choosing several shapes against one canvas. Taking 8 per round is faster still (0.81 s) but
+    // costs quality (0.9430), because that many disjoint improvements do not exist in one round.
+    public int BatchPlace = 4;
+    // After the greedy pass, re-fit each primitive with the ones after it taken into account (docs/research/08 §15).
+    // 0 = off. Measured on kodim05 at 512/4000 (Ryzen, 16 threads): the greedy pass alone takes 1.8 s and reaches
+    // 0.9473; one sweep of 300 iterations takes 3.4 s and reaches 0.9536, which is 76 % of what three sweeps of 1200
+    // iterations get (7.0 s, 0.9556). More iterations per sweep buy nothing (1 x 1200 = 1 x 300); more sweeps do.
+    // The first seconds of the picture are unchanged - this improves the finished one.
+    public int RefineSweeps = 1;
+    public int RefineIters = 300, RefineAge = 60;
     public uint Seed = 0x5eed;
     public string Label => $"e{Cb}.{Rb}.{Ab}-c{Col[0]}{Col[1]}{Col[2]}a{ABits}-r{R}-n{MaxPrims}";
 }
@@ -251,6 +265,11 @@ public sealed unsafe class PrimEncoder
 
     sealed class Cand { public int[] Codes = new int[5]; public Score S; }
 
+    readonly List<(int x0, int y0, int x1, int y1)> boxes = new();
+    (int x0, int y0, int x1, int y1) Box(ReadOnlySpan<int> codes) { var e = Geom(codes); return (e.bx0, e.by0, e.bx1, e.by1); }
+    static bool Overlaps((int x0, int y0, int x1, int y1) a, (int x0, int y0, int x1, int y1) b) =>
+        a.x0 <= b.x1 && b.x0 <= a.x1 && a.y0 <= b.y1 && b.y0 <= a.y1;
+
     void Climb(Cand c, Mulberry32 rnd, int maxAge, int maxIter)
     {
         Span<int> trial = stackalloc int[5];
@@ -262,6 +281,7 @@ public sealed unsafe class PrimEncoder
         }
     }
 
+    double[] cur0 = Array.Empty<double>();   // canvas before any primitive (the quantized mean background)
     readonly double[] prof = new double[4];
     public PrimResult Encode(int P, Action<int, int>? progress = null, CancellationToken cancellationToken = default)
     {
@@ -274,6 +294,7 @@ public sealed unsafe class PrimEncoder
         int bgCode = (q0 << 11) | (q1 << 5) | q2;
         double b0 = q0 * 255.0 / 31, b1 = q1 * 255.0 / 63, b2 = q2 * 255.0 / 31;
         for (int i = 0; i < NP; i++) { cur[i * 3] = b0; cur[i * 3 + 1] = b1; cur[i * 3 + 2] = b2; }
+        cur0 = (double[])cur.Clone();   // the background the refinement pass replays from
         Parallel.For(0, R, RebuildRow);
 
         var rnd = new Mulberry32(cfg.Seed);
@@ -306,8 +327,8 @@ public sealed unsafe class PrimEncoder
             }
             Parallel.For(0, nClimb, ci => Climb(climbs[ci], new Mulberry32(seeds[ci]), cfg.MaxAge, cfg.MaxIter));
             prof[1] += pw.Elapsed.TotalSeconds; pw.Restart();
-            var best = climbs[0];
-            for (int ci = 1; ci < nClimb; ci++) if (climbs[ci].S.d < best.S.d) best = climbs[ci];
+            var byScore = Enumerable.Range(0, nClimb).OrderBy(ci => climbs[ci].S.d).ThenBy(ci => ci).ToArray();
+            var best = climbs[byScore[0]];
             Climb(best, rnd, 30, 150); // polish
             best.S = Evaluate(best.Codes, exact: true);
             prof[2] += pw.Elapsed.TotalSeconds; pw.Restart();
@@ -315,6 +336,27 @@ public sealed unsafe class PrimEncoder
             prof[3] += pw.Elapsed.TotalSeconds;
             prims.Add(best);
             hist.Add(-Math.Min(0, best.S.d));
+            // take further shapes from this round while they improve the picture and touch none of the ones already
+            // taken (their scores were computed against the same canvas, so for disjoint shapes they still hold)
+            if (cfg.BatchPlace > 1 && j + 1 < target)
+            {
+                boxes.Clear();
+                boxes.Add(Box(best.Codes));
+                for (int bi = 1; bi < byScore.Length && prims.Count < target && boxes.Count < cfg.BatchPlace; bi++)
+                {
+                    var c2 = climbs[byScore[bi]];
+                    if (c2.S.d >= 0) break;                       // does not improve anything
+                    var box = Box(c2.Codes);
+                    bool hit = false;
+                    foreach (var o in boxes) if (Overlaps(box, o)) { hit = true; break; }
+                    if (hit) continue;
+                    boxes.Add(box);
+                    Apply(c2.Codes, c2.S);
+                    prims.Add(c2);
+                    hist.Add(-Math.Min(0, c2.S.d));
+                    j++;
+                }
+            }
             // early stop when gains become negligible (keep unit-aligned count)
             if (j + 1 >= 50 && j + 1 < target && target == target0)
             {
@@ -327,6 +369,8 @@ public sealed unsafe class PrimEncoder
 
         if (Environment.GetEnvironmentVariable("IMAGEPAD_PROFILE") == "1") Console.Error.WriteLine($"profile: rand {prof[0]:F2} s, climbs {prof[1]:F2} s, polish {prof[2]:F2} s, apply {prof[3]:F2} s");
         // pack (same bit layout as prim.js)
+        if (cfg.RefineSweeps > 0) Refine(prims, hist, progress, cancellationToken);
+
         var units = new List<List<bool>>();
         void Put(List<bool> bits, int v, int w) { for (int i = w - 1; i >= 0; i--) bits.Add(((v >> i) & 1) == 1); }
         List<bool> Header(int id) { var b = new List<bool>(); Put(b, id, L.U); return b; }
@@ -350,5 +394,194 @@ public sealed unsafe class PrimEncoder
         for (int j = 0; j < N; j++) gains[j < L.K0 ? 0 : 1 + (j - L.K0) / L.K] += hist[j];
         var padded = units.Select(u => { var a = new bool[P]; for (int i = 0; i < u.Count; i++) a[i] = u[i]; return a; }).ToList();
         return new PrimResult { Layout = L, Units = padded, Gains = gains, Canvas = cur, Prims = N, Seconds = sw.Elapsed.TotalSeconds };
+    }
+
+    // ---- refinement (docs/research/08 §15)
+    //
+    // The greedy pass fixes a primitive the moment it is placed, so it is fitted to a canvas that does not yet contain
+    // the primitives after it. Alpha-over is linear in each primitive, so with
+    //   P = the canvas just before primitive i, and (A, V) = colour and transmittance of everything after it
+    //   (the final canvas is A + V * B for any background B under them)
+    // the final squared error is  sum (e - a u (c - P))^2  with  e = T - A - V*P  and  u = V.
+    // That is the same closed form the greedy search already solves, only with the canvas P, the residual e and a
+    // per-pixel weight u - so the same mutate/climb can be reused.
+    //
+    // (A, V) is carried along: moving from primitive i-1 to i takes primitive i out of the suffix, which is the exact
+    // inverse of putting it in. An alpha of 1 is treated as 0.999 so that inverse exists, and (A, V) is rebuilt exactly
+    // every RebuildEvery primitives so the small errors cannot pile up.
+    const int RebuildEvery = 128;
+
+    void SuffixUnder(Cand p, double[] A, double[] V)
+    {
+        var e = Geom(p.Codes);
+        double a0 = Math.Min(0.999, alphas[p.S.q]);
+        double r = p.S.r * 255.0 / cLv[0], g = p.S.g * 255.0 / cLv[1], b = p.S.b * 255.0 / cLv[2];
+        for (int y = e.by0; y <= e.by1; y++)
+        {
+            Span(e, y, out int xa, out int xb);
+            for (int x = xa; x <= xb; x++)
+            {
+                int px = y * R + x, o = px * 3;
+                A[o] += V[px] * r * a0; A[o + 1] += V[px] * g * a0; A[o + 2] += V[px] * b * a0;
+                V[px] *= 1 - a0;
+            }
+        }
+    }
+
+    void SuffixRemove(Cand p, double[] A, double[] V)
+    {
+        var e = Geom(p.Codes);
+        double a0 = Math.Min(0.999, alphas[p.S.q]);
+        double r = p.S.r * 255.0 / cLv[0], g = p.S.g * 255.0 / cLv[1], b = p.S.b * 255.0 / cLv[2];
+        for (int y = e.by0; y <= e.by1; y++)
+        {
+            Span(e, y, out int xa, out int xb);
+            for (int x = xa; x <= xb; x++)
+            {
+                int px = y * R + x, o = px * 3;
+                V[px] /= 1 - a0;
+                A[o] -= V[px] * r * a0; A[o + 1] -= V[px] * g * a0; A[o + 2] -= V[px] * b * a0;
+            }
+        }
+    }
+
+    void PaintOn(double[] canvas, Cand p)
+    {
+        var e = Geom(p.Codes);
+        double a = alphas[p.S.q], ia = 1 - a;
+        double r = p.S.r * 255.0 / cLv[0] * a, g = p.S.g * 255.0 / cLv[1] * a, b = p.S.b * 255.0 / cLv[2] * a;
+        for (int y = e.by0; y <= e.by1; y++)
+        {
+            Span(e, y, out int xa, out int xb);
+            for (int x = xa; x <= xb; x++)
+            {
+                int o = (y * R + x) * 3;
+                canvas[o] = canvas[o] * ia + r; canvas[o + 1] = canvas[o + 1] * ia + g; canvas[o + 2] = canvas[o + 2] * ia + b;
+            }
+        }
+    }
+
+    // score a candidate against (P, A, V): the change of the FINAL squared error (negative is better)
+    Score EvaluateRefine(ReadOnlySpan<int> codes, double[] P, double[] A, double[] V)
+    {
+        var e = Geom(codes);
+        double S1_0 = 0, S1_1 = 0, S1_2 = 0, S2_0 = 0, S2_1 = 0, S2_2 = 0, S3 = 0, S4_0 = 0, S4_1 = 0, S4_2 = 0, S5_0 = 0, S5_1 = 0, S5_2 = 0;
+        for (int y = e.by0; y <= e.by1; y++)
+        {
+            Span(e, y, out int xa, out int xb);
+            for (int x = xa; x <= xb; x++)
+            {
+                int px = y * R + x, o = px * 3;
+                double u = V[px], uu = u * u;
+                S3 += uu;
+                double p0 = P[o], e0 = tgt[o] - A[o] - u * p0;
+                double p1 = P[o + 1], e1 = tgt[o + 1] - A[o + 1] - u * p1;
+                double p2 = P[o + 2], e2 = tgt[o + 2] - A[o + 2] - u * p2;
+                S1_0 += u * e0; S1_1 += u * e1; S1_2 += u * e2;
+                S2_0 += u * e0 * p0; S2_1 += u * e1 * p1; S2_2 += u * e2 * p2;
+                S4_0 += uu * p0; S4_1 += uu * p1; S4_2 += uu * p2;
+                S5_0 += uu * p0 * p0; S5_1 += uu * p1 * p1; S5_2 += uu * p2 * p2;
+            }
+        }
+        var best = new Score { d = double.PositiveInfinity };
+        if (S3 <= 1e-12) return new Score { d = 0 };
+        for (int q = 0; q < alphas.Length; q++)
+        {
+            double a = alphas[q];
+            double tot = 0;
+            int[] cc = new int[3];
+            for (int ch = 0; ch < 3; ch++)
+            {
+                double S1 = ch == 0 ? S1_0 : ch == 1 ? S1_1 : S1_2;
+                double S2 = ch == 0 ? S2_0 : ch == 1 ? S2_1 : S2_2;
+                double S4 = ch == 0 ? S4_0 : ch == 1 ? S4_1 : S4_2;
+                double S5 = ch == 0 ? S5_0 : ch == 1 ? S5_1 : S5_2;
+                double col = S1 / (a * S3) + S4 / S3;
+                col = col < 0 ? 0 : col > 255 ? 255 : col;
+                int qc = (int)Math.Floor(col / 255 * cLv[ch] + 0.5);
+                double v = qc * 255.0 / cLv[ch];
+                cc[ch] = qc;
+                tot += -2 * v * a * S1 + 2 * a * S2 + v * v * a * a * S3 - 2 * v * a * a * S4 + a * a * S5;
+            }
+            if (tot < best.d) best = new Score { d = tot, q = q, r = cc[0], g = cc[1], b = cc[2] };
+        }
+        return best;
+    }
+
+    void Refine(List<Cand> prims, List<double> hist, Action<int, int>? progress, CancellationToken cancellationToken)
+    {
+        int n = prims.Count;
+        if (n == 0) return;
+        var P = new double[NP * 3];
+        var A = new double[NP * 3];
+        var V = new double[NP];
+        var init = new double[NP * 3];
+        var bestCodes = new int[5];
+        Array.Copy(cur0, init, init.Length);
+        Span<int> trial = stackalloc int[5];
+
+        void RebuildSuffix(int from)
+        {
+            Array.Clear(A);
+            for (int i = 0; i < NP; i++) V[i] = 1;
+            for (int j = n - 1; j >= from; j--) SuffixUnder(prims[j], A, V);
+        }
+
+        for (int sweep = 0; sweep < cfg.RefineSweeps; sweep++)
+        {
+            Array.Copy(init, P, P.Length);
+            RebuildSuffix(1);
+            var rnd = new Mulberry32(cfg.Seed ^ (uint)(0x9e3779b9 * (sweep + 1)));
+            for (int i = 0; i < n; i++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if ((i & 255) == 0) progress?.Invoke(sweep * n + i, cfg.RefineSweeps * n);
+                if (i > 0)
+                {
+                    if (i % RebuildEvery == 0) RebuildSuffix(i + 1);
+                    else SuffixRemove(prims[i], A, V);
+                }
+                var c = prims[i];
+                var s0 = EvaluateRefine(c.Codes, P, A, V);
+                c.Codes.CopyTo(bestCodes, 0);
+                var bestS = s0;
+                for (int age = 0, it = 0; age < cfg.RefineAge && it < cfg.RefineIters; it++)
+                {
+                    Mutate(bestCodes, trial, rnd);
+                    var s = EvaluateRefine(trial, P, A, V);
+                    if (s.d < bestS.d) { trial.CopyTo(bestCodes); bestS = s; age = 0; } else age++;
+                }
+                bestCodes.CopyTo(c.Codes, 0);
+                c.S = bestS;
+                PaintOn(P, c);
+            }
+        }
+
+        // replay: the canvas the decoder will produce, and the per-primitive gains the send order uses
+        Array.Copy(init, cur, cur.Length);
+        for (int i = 0; i < n; i++)
+        {
+            var p = prims[i];
+            var e = Geom(p.Codes);
+            double a = alphas[p.S.q], ia = 1 - a;
+            double r = p.S.r * 255.0 / cLv[0] * a, g = p.S.g * 255.0 / cLv[1] * a, b = p.S.b * 255.0 / cLv[2] * a;
+            double d = 0;
+            for (int y = e.by0; y <= e.by1; y++)
+            {
+                Span(e, y, out int xa, out int xb);
+                for (int x = xa; x <= xb; x++)
+                {
+                    int o = (y * R + x) * 3;
+                    for (int ch = 0; ch < 3; ch++)
+                    {
+                        double c0 = cur[o + ch], t0 = tgt[o + ch];
+                        double nc = c0 * ia + (ch == 0 ? r : ch == 1 ? g : b);
+                        d += (t0 - nc) * (t0 - nc) - (t0 - c0) * (t0 - c0);
+                        cur[o + ch] = nc;
+                    }
+                }
+            }
+            hist[i] = -Math.Min(0, d);
+        }
     }
 }

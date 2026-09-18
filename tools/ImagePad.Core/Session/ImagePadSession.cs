@@ -12,6 +12,9 @@ public sealed class SessionOptions
     public TimeSpan ProgressInterval { get; init; } = TimeSpan.FromMilliseconds(250);
     // a render of 4000 primitives at 512 px takes tens of ms; twice a second is enough to watch the image build up
     public TimeSpan ReceivedPreviewInterval { get; init; } = TimeSpan.FromMilliseconds(500);
+    // While sending, ask the client every so often whether it still has the same avatar. Packets meant for one decoder
+    // produce a broken picture on another, so sending has to stop when the avatar is swapped. 0 disables the check.
+    public TimeSpan AvatarCheckInterval { get; init; } = TimeSpan.FromSeconds(5);
     public int PreviewLongSide { get; init; } = 512;
 }
 
@@ -276,7 +279,9 @@ public sealed class ImagePadSession : IAsyncDisposable
         var image = ready.Image;
         var schedule = Schedules.Create(s0.Schedule, image.Gains) ?? Schedules.Create(Schedules.Default, image.Gains)!;
         int epoch = lastEpoch = lastEpoch % 3 + 1;  // 1..3; a new epoch makes receivers clear the old image
-        var bundles = Packets.Build(image.Units, epoch, image.Aspect, image.Spec.Ints).Select(OscSender.Bundle).ToArray();
+        // the avatar tells which parameter names it has (prefixed, or the plain D0.. of avatars built earlier)
+        string prefix = Snapshot.Target?.ParamPrefix ?? "";
+        var bundles = Packets.Build(image.Units, epoch, image.Aspect, image.Spec.Ints).Select(p => OscSender.Bundle(p, prefix)).ToArray();
         IOscTransport transport;
         try { transport = transportFactory(target); }
         catch (Exception e) { throw new ImageSourceException($"送信先に接続できませんでした: {e.Message}", e); }
@@ -285,6 +290,25 @@ public sealed class ImagePadSession : IAsyncDisposable
         var start = new SendProgress(epoch, s0.Schedule, target.Name, 0, 0, image.Units.Count, TimeSpan.Zero, null);
         Update(s => s with { Send = new SendState.Active(start) });
         sendTask = Task.Run(() => SendLoop(image, bundles, schedule, transport, start, cts.Token));
+    }
+
+    // null while the target still matches what was encoded; otherwise the message to show
+    async Task<string?> CheckTargetStillFits(EncodedImage image)
+    {
+        var target = Snapshot.Target;
+        if (target is null) return null;
+        VrcClient? now;
+        try { now = await VrcDiscovery.RecheckAsync(target); }
+        catch (Exception) { return null; }   // a hiccup in the query is not a reason to stop sending
+        if (now is null) return null;        // a fixed address (no OSCQuery): nothing to compare against
+        if (!IsUsable(now))
+            return "アバターが変わり、ImagePad が入っていないアバターになりました。送信を止めました。";
+        var spec = DecoderSpec.For(now);
+        if (!spec.SameLayout(image.Spec))
+            return $"アバターが {spec.Format.Name}・Int {spec.Ints} 個に変わりました。送信を止めたので、画像を作り直して送り直してください。";
+        if (now.AvatarId is { } id && target.AvatarId is { } was && id != was)
+            return "アバターが変わりました（同じ形式ですが別のアバターです）。送信を止めました。";
+        return null;
     }
 
     void SendLoop(EncodedImage image, byte[][] bundles, Func<int, int> schedule, IOscTransport transport, SendProgress progress, CancellationToken ct)
@@ -296,6 +320,9 @@ public sealed class ImagePadSession : IAsyncDisposable
         var lastProgress = TimeSpan.Zero;
         var lastRender = -options.ReceivedPreviewInterval; // render at the first packet
         Preview? receivedPreview = null;
+        // The check is an HTTP request, so it runs off the sending thread: the loop must keep its 100 ms beat.
+        var lastCheck = TimeSpan.Zero;
+        Task<string?>? check = null;
         try
         {
             using var timer = TimerResolution.Begin();
@@ -317,6 +344,21 @@ public sealed class ImagePadSession : IAsyncDisposable
                     receivedPreview = ToPreview(Img.FromRgbBytes(PrimRenderer.Render(image.Config, image.Layout, received), image.Config.R, image.Config.R), image.Aspect);
                     renderedDistinct = distinct; lastRender = now;
                     progress = progress with { Received = receivedPreview };
+                }
+                if (check is { IsCompleted: true })
+                {
+                    var changed = check.Result;
+                    check = null;
+                    if (changed is not null)
+                    {
+                        Update(s => s with { Send = new SendState.Failed(changed) });
+                        return;
+                    }
+                }
+                else if (check is null && options.AvatarCheckInterval > TimeSpan.Zero && now - lastCheck >= options.AvatarCheckInterval)
+                {
+                    lastCheck = now;
+                    check = Task.Run(() => CheckTargetStillFits(image), ct);
                 }
                 if (now - lastProgress >= options.ProgressInterval)
                 {

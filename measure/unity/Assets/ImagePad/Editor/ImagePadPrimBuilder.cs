@@ -195,7 +195,7 @@ public static class ImagePadPrimBuilder
         {
             var clip = new AnimationClip { name = $"ImagePadPrim_Set_P{i}" };
             foreach (var q in quads) AnimationUtility.SetEditorCurve(clip, EditorCurveBinding.FloatCurve(q, typeof(MeshRenderer), $"material._P{i}"), Const(1));
-            children.Add(new ChildMotion { motion = Save(clip, clip.name + ".anim"), directBlendParameter = $"D{i}", timeScale = 1 });
+            children.Add(new ChildMotion { motion = Save(clip, clip.name + ".anim"), directBlendParameter = ImagePadNames.Data(i), timeScale = 1 });
         }
         var baseClip = new AnimationClip { name = "ImagePadPrim_Base" };
         foreach (var q in quads) for (int i = 0; i < bytes; i++) AnimationUtility.SetEditorCurve(baseClip, EditorCurveBinding.FloatCurve(q, typeof(MeshRenderer), $"material._P{i}"), Const(0));
@@ -205,7 +205,7 @@ public static class ImagePadPrimBuilder
         var ctrlPath = $"{Gen}/ImagePadPrim_FX.controller";
         if (AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(ctrlPath) != null) AssetDatabase.DeleteAsset(ctrlPath);
         var ctrl = AnimatorController.CreateAnimatorControllerAtPath(ctrlPath);
-        for (int i = 0; i < bytes; i++) ctrl.AddParameter($"D{i}", AnimatorControllerParameterType.Float);
+        for (int i = 0; i < bytes; i++) ctrl.AddParameter(ImagePadNames.Data(i), AnimatorControllerParameterType.Float);
         ctrl.AddParameter(new AnimatorControllerParameter { name = "ImagePadPrim_One", type = AnimatorControllerParameterType.Float, defaultFloat = 1 });
         var tree = new BlendTree { name = "ImagePadPrimDirect", blendType = BlendTreeType.Direct, useAutomaticThresholds = false, hideFlags = HideFlags.HideInHierarchy };
         tree.children = children.ToArray();
