@@ -3,7 +3,8 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
-const root = path.join(__dirname, '..', '..', 'sim', 'images', 'src');
+// 既定は sim/images/src。第 2 引数でフォルダを差し替えられる（大きい画像で試すときに使う）
+const root = process.argv[3] ? path.resolve(process.argv[3]) : path.join(__dirname, '..', '..', 'sim', 'images', 'src');
 const port = Number(process.argv[2] || 8765);
 http.createServer((req, res) => {
   const file = path.join(root, path.basename(decodeURIComponent(req.url.split('?')[0])));

@@ -388,6 +388,7 @@ public sealed class MainViewModel : ViewModelBase
                         string what = img.Qr ? $"QR コード（{(int)Math.Sqrt(img.Prims)} × {(int)Math.Sqrt(img.Prims)} 升）" : $"図形 {img.Prims} 個";
                         EncodeText = $"変換しました：{what}、{img.Units.Count} パケット（1 周 約 {FormatDuration(TimeSpan.FromSeconds(lap))}）。" +
                                      $"{img.Spec.DisplayName}・Int {img.Spec.Ints} 個のアバター向け{(img.Spec.Assumed ? "（アバターの種類が分からないため既定の設定）" : "")}";
+                        ReleaseAfterEncode();
                         break;
                     case EncodeState.Failed f:
                         EncodedImage = null; EncodeProgress = 0; EncodeText = f.Message;
@@ -509,6 +510,17 @@ public sealed class MainViewModel : ViewModelBase
         t.TotalMinutes >= 1 ? $"{(int)t.TotalMinutes} 分 {t.Seconds} 秒"
         : t.TotalSeconds >= 1 ? $"{t.Seconds} 秒"
         : $"{t.TotalSeconds:0.0} 秒";   // a QR code is well under a second, and "0 秒" reads like nothing happened
+
+    // 画像を 1 枚変換し終えたところで、大きな配列（元画像・作業用キャンバス・デコードした画素）を片付ける。
+    // 1 枚あたり数百 MB を確保して捨てるので、放っておくと大きなオブジェクトの山が縮まないまま積み上がる。
+    // 変換は人が操作したときにしか起きず、そのあとは待ち時間なので、ここで回収してよい。
+    static void ReleaseAfterEncode()
+    {
+        System.Runtime.GCSettings.LargeObjectHeapCompactionMode = System.Runtime.GCLargeObjectHeapCompactionMode.CompactOnce;
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
+    }
 
     static BitmapSource ToBitmap(Preview p)
     {
