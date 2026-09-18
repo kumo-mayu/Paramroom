@@ -47,7 +47,7 @@ public static class ParamroomBuilder
     public static readonly Dictionary<int, Format> Formats = new()
     {
         [3] = new Format { canvas = 512, prims = 4000, cb = 9, rb = 8, ab = 6, cr = 5, cg = 6, cbl = 5, abits = 2, name = "512/4000", prefab = "ParamroomDecoder512", far = 0.0247f },
-        [4] = new Format { canvas = 512, prims = 4000, cb = 8, rb = 6, ab = 5, cr = 4, cg = 4, cbl = 4, abits = 2, name = "512/4000 軽量", prefab = "ParamroomDecoder512Light", far = 0.0267f },
+        [4] = new Format { canvas = 512, prims = 4000, cb = 8, rb = 6, ab = 5, cr = 4, cg = 4, cbl = 4, abits = 2, name = "512/4000 軽量（おすすめ）", prefab = "ParamroomDecoder512Light", far = 0.0267f },
         [5] = new Format { canvas = 512, prims = 5000, cb = 8, rb = 6, ab = 5, cr = 4, cg = 4, cbl = 4, abits = 2, name = "512/5000 軽量", prefab = "ParamroomDecoder512Light5000", far = 0.0277f },
         // 1024 canvas (docs/research/08 §17): coordinates need 10 bits, so the angle drops to 5 to keep the primitive at
         // 59 bits and leave the packet 8 spare bits for the aspect code. Made to measure the GPU cost in VRChat: the
@@ -418,7 +418,9 @@ public static class ParamroomBuilder
 
 public sealed class ParamroomBuilderWindow : EditorWindow
 {
-    int formatId = 3;
+    // Format 4 is the recommended default: same 4000 primitives as 3 but 5 per packet, so a lap is 80 s instead of
+    // 100 s and the early picture is slightly better; final quality is a hair lower (measure/results/2026-09-17/precision).
+    int formatId = 4;
     int selected = -1;
     int kind;            // 0 = 画像と QR の両方、1 = QR 専用
     int qrBytes = 4;

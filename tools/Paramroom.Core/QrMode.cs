@@ -9,7 +9,7 @@
 //   unit 0: [unit id u][header 16][k0 slots]      header = [modules 8][reserved 8]
 //   unit i: [unit id u][k slots]                  slot = primBits module bits, row by row
 //
-// A 25 x 25 code is 625 bits = 3 packets, so it is complete in about 0.3 s (a picture takes 100 s).
+// A 25 x 25 code is 625 bits = 3 packets, so it is complete in about 0.3 s (a picture takes 80-100 s).
 using Net.Codecrete.QrCodeGenerator;
 
 namespace Paramroom;
