@@ -366,7 +366,7 @@ public class DropAndHistoryTests
         {
             var png = Path.Combine(dir, "a.png");
             var pixels = new byte[4 * 4 * 3];
-            using (var fs = File.Create(png)) new StbImageWriteSharp.ImageWriter().WritePng(pixels, 4, 4, StbImageWriteSharp.ColorComponents.RedGreenBlue, fs);
+            PngWriter.WriteRgb(png, pixels, 4, 4);
             var store = new JsonFileHistory(Path.Combine(dir, "history.json"));
             await using (var session = new ImagePadSession(new FixedTargetFinder(new VrcClient("c", "127.0.0.1", 1, null, 32, 3, null)), _ => throw new InvalidOperationException(), new StbImageDecoder(), new HttpImageFetcher(), new SessionOptions { EncodePrimsLimit = 50 }, store))
             {

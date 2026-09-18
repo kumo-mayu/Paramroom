@@ -20,7 +20,6 @@
 
   <ItemGroup>
     <PackageReference Include="StbImageSharp" Version="2.30.16" />
-    <PackageReference Include="StbImageWriteSharp" Version="1.16.7" />
     <PackageReference Include="VRChat.OSCQuery" Version="0.0.7" />
   </ItemGroup>
 

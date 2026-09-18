@@ -158,8 +158,7 @@ else
     if (Opt("png") is string png)
     {
         var bytes = res.Canvas.Select(v => (byte)Math.Max(0, Math.Min(255, Math.Floor(v + 0.5)))).ToArray();
-        using var fs = File.Create(png);
-        new StbImageWriteSharp.ImageWriter().WritePng(bytes, R, R, StbImageWriteSharp.ColorComponents.RedGreenBlue, fs);
+        PngWriter.WriteRgb(png, bytes, R, R);
         Console.WriteLine($"wrote {png}");
     }
 }
