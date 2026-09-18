@@ -41,12 +41,28 @@ VRChat の [Terms of Service](https://hello.vrchat.com/legal) /
 | Unity ＋ VRChat SDK (Avatars) | アバターをアップロードできる環境。動作確認は Unity 2022.3.22f1 / SDK 3.10.4 |
 | [Modular Avatar](https://modular-avatar.nadena.dev/) | プレハブを置くだけでパラメータとアニメーターが入ります。1.17.1 で確認 |
 | アバターの同期パラメータの空き | **Int 32 個（256 bit）**が理想。少ない数でも動きます |
-| Windows PC と .NET 9 | 送信アプリ（`tools/Paramroom.App`）を動かすため |
+| Windows PC | 送信アプリを動かすため。配布している exe は .NET を同梱しているので、別途入れる必要はありません |
 | VRChat の OSC が有効 | 送信アプリがアバターのパラメータを動かすのに使います |
+
+## ダウンロード
+
+[Releases](https://github.com/kumo-mayu/Paramroom/releases) から 2 つ取ってください。
+
+| ファイル | 何に使うか |
+|---|---|
+| `Paramroom-unity-vX.Y.Z.unitypackage` | アバターに入れる部品。Unity のプロジェクトにインポートする |
+| `Paramroom.App.exe` | 画像を送るアプリ。置いた場所から直接起動できます（インストール不要） |
+
+exe に電子署名はしていません。初回起動時に Windows の SmartScreen が
+「WindowsによってPCが保護されました」と出ることがあります。**詳細情報** →
+**実行** で起動できます。気になる場合は、このリポジトリをそのままビルドしてください
+（`dotnet publish tools/Paramroom.App -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true`）。
 
 ## 入れかた
 
-1. `measure/unity/Assets/kumo-mayu` を、アバターのプロジェクトの `Assets/` に入れる（`Assets/kumo-mayu/Paramroom` になります）。
+1. `Paramroom-unity-vX.Y.Z.unitypackage` をプロジェクトにインポートする
+   （`Assets/kumo-mayu/Paramroom` に入ります）。リポジトリから使う場合は
+   `measure/unity/Assets/kumo-mayu` を `Assets/` にコピーしても同じです。
 2. ヒエラルキーでアバター（またはその子）を選ぶ。
 3. **Tools/Paramroom/Decoder Builder** を開く。アバターの同期ビットの空きが表示されるので、
    収まる Int 数を選んで作る（**迷ったら形式 3 ＋ 32 Int**）。
