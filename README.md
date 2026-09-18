@@ -53,6 +53,9 @@ VRChat の [Terms of Service](https://hello.vrchat.com/legal) /
 
 [Releases](https://github.com/kumo-mayu/Paramroom/releases) から 2 つ取ってください。
 
+[BOOTH](https://kumo-mayu.booth.pm/items/8868240) でも同じものを配っています（2 つと LICENSE などを 1 つの zip に
+まとめたもの）。無料版と支援版があり、中身は同じです。
+
 | ファイル | 何に使うか |
 |---|---|
 | `Paramroom-unity-*.unitypackage` | アバターに入れる部品。Unity のプロジェクトにインポートする |
