@@ -26,7 +26,11 @@ description: Paramroom 送信アプリ（tools/Paramroom.App）の画面を確�
 
 ## 流れ
 
-1. `dotnet build tools/Paramroom.sln`。自分で起動したアプリが開いていると失敗するので、先に `Stop-ParamroomApp` する。
+1. **`dotnet build tools/Paramroom.sln -c Debug`**（この道具が起動するのは Debug のビルド。
+   Release だけ作り直しても画面は変わらないので注意）。
+   - 自分で起動したアプリが開いていると失敗するので、先に `Stop-ParamroomApp` する
+   - **ユーザーが自分で起動していることもある**（`MSB3027 ... によってロックされています` に別の pid が出る）。
+     その場合は勝手に落とさず、閉じてよいか聞く
 2. 画像は URL で渡すと、UI Automation だけで操作できる。手元の画像は `node measure/analysis/serve-images.js`（`sim/images/src` を `http://127.0.0.1:8765/` で配る）を裏で動かし、`http://127.0.0.1:8765/kodim23.png` を入れる。
 3. 送った中身まで確かめるときは、宛先のポートで UDP を受ける（`measure/osc/check-sender.js` は units の JSON が要る）。
 4. 撮って見て、`Stop-ParamroomApp` で閉じる。
