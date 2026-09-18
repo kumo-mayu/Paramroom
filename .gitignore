@@ -1,6 +1,9 @@
 # dependencies / caches
 node_modules/
 sim/cache/
+# 1024 reference images (41 MB, rebuilt with: node sim/prepare.js 1024)
+sim/images/ref1024/
+sim/images/ref1024-train/
 # large regenerable simulation outputs (raw rows are hundreds of MB; summaries are kept)
 sim/results/*.jsonl
 sim/out/

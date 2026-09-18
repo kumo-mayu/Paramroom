@@ -212,7 +212,7 @@ function cfgOf(o) {
     : o.shape === 'mix' ? `m${o.cb}.${o.rb}.${o.ab}`
     : o.shape === 'tri' ? `t${o.cb}` : `q${o.cb}`;
   const soft = (o.soft ? '-s' + o.soft.map(([q, w]) => `${q}:${w}`).join('_') : '') + (o.circle ? '-circ' : '') + (o.blend === 'add' ? '-add' : '')
-    + (o.refine ? `-rf${o.refine.sweeps || 1}${o.refine.from ? 'f' + o.refine.from : ''}` : '');
+    + (o.refine ? `-rf${o.refine.sweeps || 1}${o.refine.from ? 'f' + o.refine.from : ''}${o.refine.restart ? 'r' + o.refine.restart : ''}${o.refine.pattern ? 'p' : ''}` : '');
   const label = `${geo}-c${col.join('')}a${o.aBits || 0}-r${o.R}-n${o.maxPrims}${soft}`;
   return { alpha: 0.5, ...o, col, label };
 }
@@ -559,7 +559,23 @@ module.exports = {
       // cfg.refine.from: leave the first fraction of the primitives alone. Re-fitting improves the FINAL image but
       // can make the first seconds very slightly worse, so the early (most visible) primitives can be kept as they are.
       const firstKept = Math.round((cfg.refine.from || 0) * prims.length);
+      // cfg.refine.restart: the fraction of primitives (the ones contributing least to the final image) that get a
+      // fresh search instead of a local climb. Re-fitting only moves a primitive a little; a primitive that ended up
+      // worthless is better thrown away and looked for somewhere else, which is the structural change a local climb
+      // cannot make.
+      const restartFrac = cfg.refine.restart || 0;
+      const nRandR = cfg.refine.nRandR || 120;
+      const candsR = restartFrac ? Array.from({ length: nRandR }, () => ({ codes: new Int32Array(ng), d: 0, r: new Int32Array(4) })) : null;
+      let restartCut = -Infinity, restarted = 0;
       for (let sweep = 0; sweep < sweeps; sweep++) {
+        if (restartFrac) {
+          // where is the final image still wrong? (the sampler randomShape() uses) and which primitives are worthless?
+          cur.set(initCanvas);
+          for (const p of prims) applyPrim(cur, p);
+          buildCum();
+          const sorted = hist.slice().sort((x, y) => x - y);
+          restartCut = sorted[Math.min(sorted.length - 1, Math.round(restartFrac * sorted.length))];
+        }
         P.set(initCanvas);
         rebuildSuffix(1);                       // (A, V) for the primitives after index 0
         for (let i = 0; i < prims.length; i++) {
@@ -580,10 +596,59 @@ module.exports = {
           if (i >= firstKept) {
             const c = { codes: prims[i].codes.slice(), d: 0, r: prims[i].r.slice() };
             c.d = evalRefine(c.codes, c.r);
-            for (let a2 = 0, it = 0; a2 < age0 && it < iters; it++) {
-              mutate(c.codes, trial);
-              const d = evalRefine(trial, tr);
-              if (d < c.d) { c.codes.set(trial); c.d = d; c.r.set(tr); a2 = 0; } else a2++;
+            const climbFrom = x => {
+              for (let a2 = 0, it = 0; a2 < age0 && it < iters; it++) {
+                mutate(x.codes, trial);
+                const d = evalRefine(trial, tr);
+                if (d < x.d) { x.codes.set(trial); x.d = d; x.r.set(tr); a2 = 0; } else a2++;
+              }
+            };
+            // cfg.refine.pattern: instead of random mutations, walk each field up and down with a step that halves
+            // when no field can improve any more (pattern search). The field values are integers, so this reaches the
+            // local optimum exactly, and it needs far fewer evaluations than random hill climbing.
+            const patternFrom = x => {
+              const step = new Int32Array(ng);
+              for (let f2 = f0; f2 < ng; f2++) step[f2] = Math.max(1, Math.round((gmax[f2] + 1) / 8));
+              const wrap = f2 => f2 === f0 + 4 && cfg.shape !== 'tri' && cfg.shape !== 'rect' && !cfg.circle;
+              for (let round = 0; round < 60; round++) {
+                let moved = false;
+                for (let f2 = f0; f2 < ng; f2++) {
+                  for (const dir of [1, -1]) {
+                    trial.set(x.codes);
+                    const m = gmax[f2], v = x.codes[f2] + dir * step[f2];
+                    trial[f2] = wrap(f2) ? ((v % (m + 1)) + m + 1) % (m + 1) : Math.max(0, Math.min(m, v));
+                    if (trial[f2] === x.codes[f2]) continue;
+                    const d = evalRefine(trial, tr);
+                    if (d < x.d) { x.codes.set(trial); x.d = d; x.r.set(tr); moved = true; break; }
+                  }
+                }
+                if (!moved) {
+                  let all1 = true;
+                  for (let f2 = f0; f2 < ng; f2++) { step[f2] = Math.max(1, step[f2] >> 1); if (step[f2] > 1) all1 = false; }
+                  if (all1 && round > 0) { // one last pass at step 1, then stop
+                    let again = false;
+                    for (let f2 = f0; f2 < ng && !again; f2++) for (const dir of [1, -1]) {
+                      trial.set(x.codes);
+                      const m = gmax[f2], v = x.codes[f2] + dir;
+                      trial[f2] = wrap(f2) ? ((v % (m + 1)) + m + 1) % (m + 1) : Math.max(0, Math.min(m, v));
+                      if (trial[f2] === x.codes[f2]) continue;
+                      const d = evalRefine(trial, tr);
+                      if (d < x.d) { x.codes.set(trial); x.d = d; x.r.set(tr); again = true; break; }
+                    }
+                    if (!again) break;
+                  }
+                }
+              }
+            };
+            if (cfg.refine.pattern) patternFrom(c); else climbFrom(c);
+            if (restartFrac && hist[i] <= restartCut) {
+              for (const cd of candsR) { randomShape(cd.codes); cd.d = evalRefine(cd.codes, cd.r); }
+              candsR.sort((x, y) => x.d - y.d);
+              for (let ci = 0; ci < 3; ci++) {
+                const x = { codes: candsR[ci].codes.slice(), d: candsR[ci].d, r: candsR[ci].r.slice() };
+                climbFrom(x);
+                if (x.d < c.d) { c.codes.set(x.codes); c.d = x.d; c.r.set(x.r); restarted++; }
+              }
             }
             prims[i] = c;
           }

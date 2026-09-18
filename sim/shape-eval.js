@@ -13,7 +13,7 @@ const primx = require('./codecs/primx');
 const { padBits } = require('./lib/evaluate');
 
 const P = 254;
-const R = 512;
+const R = Number(process.env.IMAGEPAD_R || 512);  // 512 by default; IMAGEPAD_R=1024 for the bigger canvas study
 const FRACS = [0.05, 0.15, 0.4, 1];
 
 const { VARIANTS, UNITS, cfgFor: variantCfg } = require('./lib/shape-variants');
@@ -23,7 +23,7 @@ const outFile = path.join(__dirname, 'results', 'shapeeval.jsonl');
 const [cmd, image, variant] = process.argv.slice(2);
 
 const cfgFor = name => variantCfg(name, R, P);
-const cacheFile = (img = image, v = variant) => path.join(cacheDir, `${img}-${v}.json`);
+const cacheFile = (img = image, v = variant) => path.join(cacheDir, `${img}-${v}${R === 512 ? '' : '-r' + R}.json`);
 const refOf = img => I.loadPNG(path.join(__dirname, 'images', 'ref' + R, img + '.png'));
 
 if (cmd === 'encode') {

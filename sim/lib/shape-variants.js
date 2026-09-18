@@ -45,6 +45,29 @@ const VARIANTS = {
   rft: { shape: 'ell', cb: 9, rb: 8, ab: 6, col: [5, 6, 5], aBits: 2, refine: { sweeps: 2, from: 0.15 } },
   deepsoftrft: { shape: 'ell', cb: 9, rb: 8, ab: 6, col: [5, 6, 5], aBits: 2, soft: SOFT3, ...DEEP, refine: { sweeps: 2, from: 0.15 } },
   capdeeprft: { shape: 'cap', cb: 9, rb: 8, ab: 6, col: [5, 6, 5], aBits: 2, ...DEEP, refine: { sweeps: 2, from: 0.15 } },
+  // how many sweeps of re-fitting are worth it?
+  rf1: { shape: 'ell', cb: 9, rb: 8, ab: 6, col: [5, 6, 5], aBits: 2, refine: { sweeps: 1 } },
+  rf4: { shape: 'ell', cb: 9, rb: 8, ab: 6, col: [5, 6, 5], aBits: 2, refine: { sweeps: 4 } },
+  rf8: { shape: 'ell', cb: 9, rb: 8, ab: 6, col: [5, 6, 5], aBits: 2, refine: { sweeps: 8 } },
+  // re-fitting plus throwing away the least useful primitives and looking for them again
+  rfr3: { shape: 'ell', cb: 9, rb: 8, ab: 6, col: [5, 6, 5], aBits: 2, refine: { sweeps: 2, restart: 0.3 } },
+  rfr6: { shape: 'ell', cb: 9, rb: 8, ab: 6, col: [5, 6, 5], aBits: 2, refine: { sweeps: 2, restart: 0.6 } },
+  deeprfr6: { shape: 'ell', cb: 9, rb: 8, ab: 6, col: [5, 6, 5], aBits: 2, ...DEEP, refine: { sweeps: 2, restart: 0.6 } },
+  // --- 1024 canvas. Coordinates need 10 bits; the angle drops to 5 so that the primitive stays at 59 bits and the
+  // packet keeps 8 spare bits for the aspect-ratio code (at cb 10 / rb 8 / ab 6 only 4 would be left, which is why
+  // the aspect code has to be paid for here).
+  big: { shape: 'ell', cb: 10, rb: 8, ab: 5, col: [5, 6, 5], aBits: 2 },
+  bigrf: { shape: 'ell', cb: 10, rb: 8, ab: 5, col: [5, 6, 5], aBits: 2, refine: { sweeps: 2 } },
+  bigcapdeeprf: { shape: 'cap', cb: 10, rb: 8, ab: 5, col: [5, 6, 5], aBits: 2, ...DEEP, refine: { sweeps: 2 } },
+  bigdeepsoftrf: { shape: 'ell', cb: 10, rb: 8, ab: 5, col: [5, 6, 5], aBits: 2, soft: SOFT3, ...DEEP, refine: { sweeps: 2 } },
+  // does the best bit split change once re-fitting is in? (light = 47 bit x 5004 primitives)
+  lightrf: { shape: 'ell', cb: 8, rb: 6, ab: 5, col: [4, 4, 4], aBits: 2, refine: { sweeps: 2 } },
+  lightdeeprf: { shape: 'ell', cb: 8, rb: 6, ab: 5, col: [4, 4, 4], aBits: 2, ...DEEP, refine: { sweeps: 2 } },
+  lightsoftdeeprf: { shape: 'ell', cb: 8, rb: 6, ab: 5, col: [4, 4, 4], aBits: 2, soft: SOFT3, ...DEEP, refine: { sweeps: 2 } },
+  // the local search inside the re-fitting has not converged: more iterations keep helping
+  rfx: { shape: 'ell', cb: 9, rb: 8, ab: 6, col: [5, 6, 5], aBits: 2, refine: { sweeps: 3, iters: 1200, age: 200 } },
+  deepsoftrfx: { shape: 'ell', cb: 9, rb: 8, ab: 6, col: [5, 6, 5], aBits: 2, soft: SOFT3, ...DEEP, refine: { sweeps: 3, iters: 1200, age: 200 } },
+  capdeeprfx: { shape: 'cap', cb: 9, rb: 8, ab: 6, col: [5, 6, 5], aBits: 2, ...DEEP, refine: { sweeps: 3, iters: 1200, age: 200 } },
 };
 
 // maxPrims chosen so that every variant uses the same number of units
