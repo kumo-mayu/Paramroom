@@ -139,11 +139,36 @@ UDP で受けて到着間隔を測った（100 ms 設定、約 120 パケット�
 送信は UI とは別のスレッドで、高分解能タイマーを使って回しているため、
 画面の描画や CPU の混み具合では揺れない。
 
-**ただし「送信側の VRChat の fps」は別の話** [推測]。VRChat は受け取った OSC を
-自分のフレームでパラメータに反映するので、**送信側の VRChat が 10 fps を下回ると、
-100 ms しか出していないパケットが一度も拾われずに飛ばされる**ことがありうる。
-飛ばされたユニットは次に順番が来たときに送られるので、**遅くなるだけで壊れはしない**。
-これは VRChat の内部を測れないので確かめていない。
+**ただし「送信側の VRChat の fps」は別の話。** 公式ドキュメントとコミュニティを当たったが、
+**これを述べた資料は見つからなかった**（2026-09-18）。
+
+調べた先と、そこに書いてあったこと:
+
+| 資料 | 同期の頻度について | fps との関係 |
+|---|---|---|
+| [Animator Parameters](https://creators.vrchat.com/avatars/animator-parameters/)（公式） | IK Sync「0.1 秒ごと（毎秒 10 回）」、Playable Sync「変化に応じて 0.1〜1 秒ごと（毎秒 1〜10 回）。速い同期を当てにするな」 | **記述なし**（時間で書かれていて、フレームの話は出てこない） |
+| [OSC Overview](https://docs.vrchat.com/docs/osc-overview.md)・[OSC Avatar Parameters](https://docs.vrchat.com/docs/osc-avatar-parameters.md)（公式） | — | **記述なし**。受け取る頻度・レート制限・速く送りすぎたときの挙動、いずれも書かれていない |
+| [OSC | VRChat Wiki](https://wiki.vrchat.com/wiki/OSC) | — | **記述なし** |
+| [docs.vrchat.com/llms.txt](https://docs.vrchat.com/llms.txt)（公式の索引） | OSC 関連 10 ページを確認 | タイミングに触れたページは無い |
+
+**間接的な証拠は 1 つある。** VRCFury のパラメータ圧縮は、バッチの保持時間を
+`BATCH_TIME = 0.1` **＋ 1 フレーム**にしていて、ソースにこう書いてある:
+
+> We can't just go to the next send after 0.1s, because of a weird unity animator quirk where it will exit
+> "early" if it thinks the exit time is closer to the current frame than the next frame, which would potentially
+> make it update faster than the sync rate and lose a packet.
+
+ただしこれは **Animator の遷移がフレーム単位で判定される**という話で、
+**同期そのものがフレームに紐づいている証拠ではない**。VRCFury は Animator で値を切り替えるが、
+Paramroom は OSC で直接書くので、事情が違う。
+
+残る推論 [推測]: VRChat は Unity なので、**受け取った OSC をパラメータに反映するのは
+メインスレッド＝フレーム単位のはず**。だとすると送信側の VRChat が 10 fps を下回ると、
+100 ms しか出していない値が一度も拾われずに飛ばされうる。飛ばされたユニットは次に
+順番が来たときに送られるので、**遅くなるだけで壊れはしない**。
+
+**確かめるなら**: 送信側の VRChat を `--fps` などで 10 fps 前後に制限し、受信側で
+届いたユニット数を数える（`measure/osc/` の仕組みが使える）。未実施。
 
 ## 5. 未検証
 
