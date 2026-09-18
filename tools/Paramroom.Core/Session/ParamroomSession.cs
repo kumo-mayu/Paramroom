@@ -119,7 +119,7 @@ public sealed class ParamroomSession : IAsyncDisposable
 
     Img DecodeOrThrow(byte[] bytes)
     {
-        try { return decoder.Decode(bytes); }
+        try { return decoder.Decode(bytes, SourceLongSide); }
         catch (Exception e) { throw new ImageSourceException("画像として読めませんでした。PNG・JPEG などの画像ファイル（URL なら画像そのものの URL）を指定してください。", e); }
     }
 
@@ -162,10 +162,8 @@ public sealed class ParamroomSession : IAsyncDisposable
 
     public static Img LimitForMemory(Img image)
     {
-        int longSide = Math.Max(image.W, image.H);
-        if (longSide <= SourceLongSide) return image;
-        double s = (double)SourceLongSide / longSide;
-        return image.Resize(Math.Max(1, (int)Math.Round(image.W * s)), Math.Max(1, (int)Math.Round(image.H * s)));
+        var (w, h) = Img.ScaledSize(image.W, image.H, SourceLongSide);
+        return w == image.W && h == image.H ? image : image.Resize(w, h);
     }
 
     public void SetSource(Img image, string name)

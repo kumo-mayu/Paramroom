@@ -210,3 +210,45 @@ public class QrOnlySessionTests
         }
     }
 }
+
+// 大きな写真を読みながら縮める道（docs/research/11）。元の大きさの配列を作らないが、
+// 計算の順序は同じなので結果は 1 bit も変わらない、というのがこの実装の前提。
+public class ScaledLoadTests
+{
+    static byte[] Rgba(int w, int h, int seed)
+    {
+        var b = new byte[w * h * 4];
+        uint s = (uint)seed;
+        for (int i = 0; i < b.Length; i++) { s = s * 1664525 + 1013904223; b[i] = (byte)(s >> 24); }
+        return b;
+    }
+
+    [Theory]
+    [InlineData(3000, 2000, 2048)]
+    [InlineData(2600, 1733, 2048)]
+    [InlineData(1000, 1000, 512)]
+    [InlineData(999, 501, 256)]
+    public void ScalingWhileLoadingGivesExactlyTheSameNumbers(int w, int h, int longSide)
+    {
+        var rgba = Rgba(w, h, w * 31 + h);
+        var (tw, th) = Img.ScaledSize(w, h, longSide);
+        Assert.True(tw < w || th < h);
+
+        var viaFull = Img.FromRgba(rgba, w, h).Resize(tw, th);
+        var direct = Img.FromRgbaScaled(rgba, w, h, tw, th);
+
+        Assert.Equal(viaFull.W, direct.W);
+        Assert.Equal(viaFull.H, direct.H);
+        for (int i = 0; i < viaFull.Data.Length; i++)
+            Assert.True(viaFull.Data[i] == direct.Data[i], $"{i} 番目が違う: {viaFull.Data[i]} vs {direct.Data[i]}");
+    }
+
+    [Fact]
+    public void SmallImagesAreNotTouched()
+    {
+        Assert.Equal((800, 600), Img.ScaledSize(800, 600, 2048));
+        Assert.Equal((2048, 1536), Img.ScaledSize(2048, 1536, 2048));
+        Assert.Equal((2048, 1536), Img.ScaledSize(4000, 3000, 2048));
+        Assert.Equal((4000, 3000), Img.ScaledSize(4000, 3000, 0));   // 0 = 縮めない
+    }
+}

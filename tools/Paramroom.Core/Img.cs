@@ -22,11 +22,14 @@ public sealed class Img
     // message that says why, instead of ending as an out-of-memory error.
     public const int MaxPixels = 64_000_000;   // 64 Mpx, e.g. 8000x8000
 
-    public static Img Load(Stream s)
+    // longSide > 0 なら、その長辺に収まるまで縮めながら読む（元の大きさの配列を作らない）
+    public static Img Load(Stream s, int longSide = 0)
     {
         var r = ImageResult.FromStream(s, ColorComponents.RedGreenBlueAlpha);
         CheckSize(r.Width, r.Height);
-        return FromRgba(r.Data, r.Width, r.Height);
+        var (w, h) = ScaledSize(r.Width, r.Height, longSide);
+        return w == r.Width && h == r.Height ? FromRgba(r.Data, r.Width, r.Height)
+                                             : FromRgbaScaled(r.Data, r.Width, r.Height, w, h);
     }
 
     public static void CheckSize(int w, int h)
@@ -46,6 +49,53 @@ public sealed class Img
             for (int k = 0; k < 3; k++) img.Data[i * 3 + k] = rgba[j + k] * a + 255 * (1 - a);
         }
         return img;
+    }
+
+    // 8-bit RGBA を、元の大きさの double 配列を作らずに縮める（docs/research/11）。
+    // 4000x3000 の写真だと、その配列だけで 288 MB になる。
+    // 計算の順序は FromRgba と ResizeArea をそのまま続けたものと同じなので、結果は 1 bit も変わらない。
+    public static Img FromRgbaScaled(byte[] rgba, int W, int H, int w, int h)
+    {
+        CheckSize(W, H);
+        if (w > W || h > H) throw new ArgumentException("FromRgbaScaled は縮小だけ");
+        var o = new Img(w, h);
+        double sx = (double)W / w, sy = (double)H / h;
+        Parallel.For(0, h, Y =>
+        {
+            double y0 = Y * sy, y1 = (Y + 1) * sy;
+            Span<double> acc = stackalloc double[3];
+            for (int X = 0; X < w; X++)
+            {
+                double x0 = X * sx, x1 = (X + 1) * sx, wsum = 0;
+                acc.Clear();
+                for (int y = (int)Math.Floor(y0); y < (int)Math.Ceiling(y1); y++)
+                {
+                    double wy = Math.Min(y + 1, y1) - Math.Max(y, y0);
+                    for (int x = (int)Math.Floor(x0); x < (int)Math.Ceiling(x1); x++)
+                    {
+                        double wgt = (Math.Min(x + 1, x1) - Math.Max(x, x0)) * wy;
+                        wsum += wgt;
+                        int j = (y * W + x) * 4;
+                        double a = rgba[j + 3] / 255.0, bg = 255 * (1 - a);
+                        acc[0] += (rgba[j] * a + bg) * wgt;
+                        acc[1] += (rgba[j + 1] * a + bg) * wgt;
+                        acc[2] += (rgba[j + 2] * a + bg) * wgt;
+                    }
+                }
+                int q = (Y * w + X) * 3;
+                o.Data[q] = acc[0] / wsum; o.Data[q + 1] = acc[1] / wsum; o.Data[q + 2] = acc[2] / wsum;
+            }
+        });
+        return o;
+    }
+
+    // longSide より大きければ、その長辺に収まるところまで縮めながら読む（0 = 縮めない）
+    public static (int W, int H) ScaledSize(int w, int h, int longSide)
+    {
+        int max = Math.Max(w, h);
+        if (longSide <= 0 || max <= longSide) return (w, h);
+        double s = (double)longSide / max;
+        return (Math.Max(1, (int)Math.Round(w * s)), Math.Max(1, (int)Math.Round(h * s)));
     }
 
     // RGB bytes (rounded) for previews

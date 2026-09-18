@@ -6,16 +6,17 @@ namespace Paramroom;
 
 public interface IImageDecoder
 {
-    // throws when the bytes are not an image this decoder can read
-    Img Decode(byte[] bytes);
+    // throws when the bytes are not an image this decoder can read.
+    // longSide > 0: 読みながらその長辺まで縮める（大きな写真で数百 MB 節約する。docs/research/11）
+    Img Decode(byte[] bytes, int longSide = 0);
 }
 
 public sealed class StbImageDecoder : IImageDecoder
 {
-    public Img Decode(byte[] bytes)
+    public Img Decode(byte[] bytes, int longSide = 0)
     {
         using var ms = new MemoryStream(bytes);
-        return Img.Load(ms);
+        return Img.Load(ms, longSide);
     }
 }
 

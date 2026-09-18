@@ -10,7 +10,7 @@ public sealed class WicImageDecoder : IImageDecoder
 {
     readonly StbImageDecoder fallback = new();
 
-    public Img Decode(byte[] bytes)
+    public Img Decode(byte[] bytes, int longSide = 0)
     {
         try
         {
@@ -22,11 +22,12 @@ public sealed class WicImageDecoder : IImageDecoder
             var pixels = new byte[w * h * 4];
             bgra.CopyPixels(pixels, w * 4, 0);
             for (int i = 0; i < pixels.Length; i += 4) (pixels[i], pixels[i + 2]) = (pixels[i + 2], pixels[i]);
-            return Img.FromRgba(pixels, w, h);
+            var (tw, th) = Img.ScaledSize(w, h, longSide);
+            return tw == w && th == h ? Img.FromRgba(pixels, w, h) : Img.FromRgbaScaled(pixels, w, h, tw, th);
         }
         catch (Exception) when (bytes.Length > 0)
         {
-            return fallback.Decode(bytes);
+            return fallback.Decode(bytes, longSide);
         }
     }
 
