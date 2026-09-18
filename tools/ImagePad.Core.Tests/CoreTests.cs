@@ -349,7 +349,8 @@ public class PrimCountTests
                 : new[] { new VrcClient("c", "127.0.0.1", 9000, null, 32, 3, null) });
     }
 
-    // VRChat restarting gives it a different OSCQuery port, so a target that was found once can stop answering
+    // VRChat restarting gives it a different OSCQuery port, so a target found earlier stops answering. The client here
+    // claims an OSCQuery address that nothing listens on, which is exactly what a restarted VRChat leaves behind.
     sealed class RestartingClient : ITargetFinder
     {
         public int Calls;
@@ -357,10 +358,9 @@ public class PrimCountTests
         public Task<IReadOnlyList<VrcClient>> FindAsync(CancellationToken cancellationToken)
         {
             Calls++;
-            // no QueryIp: RecheckAsync then returns null, which is how a client that cannot be asked again behaves
             return Task.FromResult<IReadOnlyList<VrcClient>>(Gone
                 ? Array.Empty<VrcClient>()
-                : new[] { new VrcClient("c", "127.0.0.1", 9000, null, 32, 3, null) });
+                : new[] { new VrcClient("c", "127.0.0.1", 9000, null, 32, 3, null, QueryIp: "127.0.0.1", QueryPort: 1) });
         }
     }
 
@@ -373,11 +373,29 @@ public class PrimCountTests
         await session.RefreshTargetsAsync();
         Assert.NotNull(session.Snapshot.Target);
         finder.Gone = true;
-        for (int i = 0; i < 100 && session.Snapshot.Target is not null; i++) await Task.Delay(20);
-        Assert.Null(session.Snapshot.Target);           // the loop looked again and found nothing
+        for (int i = 0; i < 200 && session.Snapshot.Target is not null; i++) await Task.Delay(20);
+        Assert.Null(session.Snapshot.Target);           // asking the old address failed, so it looked again
         finder.Gone = false;
-        for (int i = 0; i < 100 && session.Snapshot.Target is null; i++) await Task.Delay(20);
+        for (int i = 0; i < 200 && session.Snapshot.Target is null; i++) await Task.Delay(20);
         Assert.NotNull(session.Snapshot.Target);        // and picks it up again when VRChat comes back
+    }
+
+    // a fixed address (IMAGEPAD_TARGET) cannot be asked over OSCQuery, so the scan loop must leave it alone
+    sealed class FixedClient : ITargetFinder
+    {
+        public Task<IReadOnlyList<VrcClient>> FindAsync(CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<VrcClient>>(new[] { new VrcClient("fixed", "127.0.0.1", 9131, null, 32, 3, null) });
+    }
+
+    [Fact]
+    public async Task KeepsAFixedTarget()
+    {
+        await using var session = new ImagePadSession(new FixedClient(), _ => throw new InvalidOperationException(), new StbImageDecoder(), new HttpImageFetcher(),
+            options: new SessionOptions { TargetScanInterval = TimeSpan.FromMilliseconds(30) });
+        await session.RefreshTargetsAsync();
+        Assert.NotNull(session.Snapshot.Target);
+        await Task.Delay(300);                          // several scans
+        Assert.NotNull(session.Snapshot.Target);
     }
 
     [Fact]
