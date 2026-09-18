@@ -1,7 +1,7 @@
 // ImagePad primitive decoder prefab builder (prototype).
 //
 // Window: Tools/ImagePad/Prim Decoder Builder
-//   - pick the decoder format (512/4000, light 512/4000, light 512/5000) and the number of synced Int
+//   - pick the decoder format (512/4000, light 512/4000, light 512/5000, 1024/4000) and the number of synced Int
 //     parameters D0..D(B-1)
 //   - only the "good" Int counts are offered: the smallest count for each number of primitives per packet (more Ints
 //     between two good counts would only add padding)
@@ -9,7 +9,7 @@
 //     Modular Avatar "Parameter Usage" window) and marks which counts fit into the free space
 //
 // A prefab contains:
-//   - two ARGBHalf atlas RenderTextures, 512x288 / 1024x536 (double-buffered camera loop, see ImagePadPrimDecoder.shader)
+//   - two ARGBHalf atlas RenderTextures, 512x288 / 1024x536 / 2048x1044 (double-buffered camera loop, see ImagePadPrimDecoder.shader)
 //   - loop cameras A/B (disabled, enabled by the FX animation) with full-viewport decoder quads
 //   - a display quad (ImagePad/PrimDisplay) showing the decoded image
 //   - FX controller: D0..D(B-1) (Float in the animator) -> Direct blend tree -> material._Pi on both decoder quads,
@@ -34,9 +34,13 @@ public static class ImagePadPrimBuilder
     public sealed class Format
     {
         public int canvas, prims, cb, rb, ab, cr, cg, cbl, abits;
+        public int batch = 32;   // primitives drawn per pass (per frame); lower = lighter frames, longer redraw
         public string name, prefab;
         public float far;  // unique loop camera far plane per format
         public int PrimBits => 2 * cb + 2 * rb + ab + cr + cg + cbl + abits;
+        // the store keeps one primitive in a 64 bit slot whose last bit marks "this one has arrived", so the fields
+        // must fit in 63 bits. Without this check a wider format would silently overwrite that mark.
+        public void Check() { if (PrimBits > 63) throw new Exception($"{name}: 1 図形 {PrimBits} bit は 63 bit を超えています"); }
     }
     // Formats 1 (256/1000) and 2 (512/2000) are no longer built (2026-09-17: 512 canvas with 4000+ primitives is the base);
     // the sender still supports avatars that have them.
@@ -98,6 +102,7 @@ public static class ImagePadPrimBuilder
     public static string Build(int formatId, int bytes)
     {
         var fmt = Formats[formatId];
+        fmt.Check();
         int canvas = fmt.canvas;
         var layout = LayoutFor(fmt, bytes) ?? throw new Exception($"no layout for {fmt.prims} primitives in {bytes} Int");
         if (layout.spare < 8) throw new Exception($"{bytes} Int: no spare byte for the aspect code");
@@ -120,7 +125,10 @@ public static class ImagePadPrimBuilder
 
         RenderTexture Atlas(string name)
         {
-            var d = new RenderTextureDescriptor(2 * canvas, canvas + storeTexels / (2 * canvas) + 16, RenderTextureFormat.ARGBHalf, 0) { sRGB = false, msaaSamples = 1, useMipMap = false, autoGenerateMips = false };
+            // store rows: the same ceiling the shader uses (InitLayout: STORE_ROWS = ceil(_StoreTexels / ATLAS_W)).
+            // Rounding down here would put the control row outside the texture whenever the two disagree.
+            int storeRows = (storeTexels + 2 * canvas - 1) / (2 * canvas);
+            var d = new RenderTextureDescriptor(2 * canvas, canvas + storeRows + 16, RenderTextureFormat.ARGBHalf, 0) { sRGB = false, msaaSamples = 1, useMipMap = false, autoGenerateMips = false };
             return Save(new RenderTexture(d) { name = name, filterMode = FilterMode.Point, wrapMode = TextureWrapMode.Clamp }, name + ".renderTexture");
         }
         var rtA = Atlas("ImagePadPrimAtlasA" + suffix);
@@ -136,6 +144,9 @@ public static class ImagePadPrimBuilder
             m.SetFloat("_Canvas", canvas); m.SetFloat("_R", canvas); m.SetFloat("_ByteCount", bytes);
             m.SetFloat("_U", layout.u); m.SetFloat("_K", layout.k); m.SetFloat("_K0", layout.k0); m.SetFloat("_NPrims", layout.maxPrims);
             m.SetFloat("_StoreTexels", storeTexels);
+            // written to BOTH materials: the A and B passes must agree on how many primitives a pass draws,
+            // otherwise their redraw counters run at different lengths and the picture never completes
+            m.SetFloat("_BatchSize", fmt.batch);
             m.SetFloat("_CB", fmt.cb); m.SetFloat("_RB", fmt.rb); m.SetFloat("_AB", fmt.ab);
             m.SetFloat("_CR", fmt.cr); m.SetFloat("_CG", fmt.cg); m.SetFloat("_CBL", fmt.cbl); m.SetFloat("_ABITS", fmt.abits);
             EditorUtility.SetDirty(m);

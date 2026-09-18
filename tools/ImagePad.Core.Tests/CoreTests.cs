@@ -243,6 +243,50 @@ public class FormatTests
         Assert.True(L.SpareBits >= 8);
     }
 
+    // format 6 (1024 canvas): the coordinates take 10 bits and the angle 5, which leaves the packet exactly the 8
+    // spare bits the aspect code needs. One bit more anywhere and the aspect code no longer fits, so this is checked.
+    [Theory]
+    [InlineData(32, 4, 1001)]
+    [InlineData(25, 3, 1334)]
+    [InlineData(18, 2, 2001)]
+    [InlineData(11, 1, 4001)]
+    public void BigFormatKeepsRoomForTheAspectCode(int ints, int k, int units)
+    {
+        var f = DecoderFormat.Known[6];
+        Assert.Equal((1024, 10, 5), (f.R, f.Cb, f.Ab));
+        Assert.Equal(59, f.PrimBits);
+        var L = PrimLayout.Of(f.Config(f.N), 8 * ints - 2);
+        Assert.Equal((k, units), (L.K, L.Units));
+        Assert.True(L.SpareBits >= 8, $"{ints} Int: spare {L.SpareBits}");
+    }
+
+    // the Int counts an error message may suggest have to be the ones that actually work for that format
+    [Theory]
+    [InlineData(3, new[] { 10, 18, 25, 32 })]
+    [InlineData(4, new[] { 9, 15, 21, 26, 32 })]
+    [InlineData(5, new[] { 9, 15, 21, 27, 32 })]
+    [InlineData(6, new[] { 11, 18, 25, 32 })]
+    public void GoodIntCountsMatchThePrefabBuilder(int formatId, int[] expected) =>
+        Assert.Equal(expected, DecoderFormat.Known[formatId].GoodIntCounts().ToArray());
+
+    // an avatar newer than this build must be reported, not silently treated as format 3
+    // a picture with too many pixels must be refused with a message, not end as an out-of-memory error
+    [Fact]
+    public void HugeImagesAreRefused()
+    {
+        var e = Assert.Throws<InvalidOperationException>(() => Img.CheckSize(12000, 12000));
+        Assert.Contains("大きすぎます", e.Message);
+        Img.CheckSize(4000, 4000);   // 16 Mpx is fine
+    }
+
+    [Fact]
+    public void UnknownFormatIsFlagged()
+    {
+        var spec = ImagePad.Session.DecoderSpec.For(new VrcClient("c", "127.0.0.1", 9000, null, 32, 99, null));
+        Assert.True(spec.Unknown);
+        Assert.Equal(99, spec.FormatId);
+    }
+
     [Fact]
     public void SpecFollowsTheAvatarFormat()
     {

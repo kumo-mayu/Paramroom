@@ -16,8 +16,10 @@ public sealed record Preview(byte[] Rgb, int Width, int Height);
 public sealed record SourceInfo(string Name, int Width, int Height, Preview Preview);
 
 // What the avatar's decoder expects. Assumed = the avatar did not tell (no target yet, or a prefab without
-// ImagePad_Format), the defaults 512/4000 are used.
-public sealed record DecoderSpec(DecoderFormatInfo Format, int Ints, int? FormatId, bool Assumed)
+// ImagePad_Format), the defaults 512/4000 are used. Unknown = the avatar named a format this build does not know
+// (an avatar newer than the app): the defaults are used too, but the user has to be told, because sending 512 data
+// to a decoder that expects something else produces a broken picture rather than a slightly worse one.
+public sealed record DecoderSpec(DecoderFormatInfo Format, int Ints, int? FormatId, bool Assumed, bool Unknown = false)
 {
     public static DecoderSpec Default { get; } = new(DecoderFormat.Default, 32, null, true);
 
@@ -29,6 +31,8 @@ public sealed record DecoderSpec(DecoderFormatInfo Format, int Ints, int? Format
         if (target is null || target.ImagePadParams <= 0) return Default;
         if (target.Format is int f && DecoderFormat.Known.TryGetValue(f, out var known))
             return new DecoderSpec(known, target.ImagePadParams, f, false);
+        if (target.Format is int unknown)
+            return Default with { Ints = target.ImagePadParams, FormatId = unknown, Unknown = true };
         return Default with { Ints = target.ImagePadParams };
     }
 

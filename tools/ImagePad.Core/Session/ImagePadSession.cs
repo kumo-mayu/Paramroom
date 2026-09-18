@@ -99,6 +99,8 @@ public sealed class ImagePadSession : IAsyncDisposable
         byte[] bytes;
         try { bytes = await fetcher.FetchAsync(url, cancellationToken); }
         catch (HttpRequestException e) { throw new ImageSourceException($"画像を取得できませんでした。URL とネットワークを確認してください（{e.Message}）。", e); }
+        // a connection dropped mid-download is an IOException (HttpIOException since .NET 8), not HttpRequestException
+        catch (IOException e) { throw new ImageSourceException($"画像の取得が途中で切れました。もう一度試してください（{e.Message}）。", e); }
         catch (TaskCanceledException e) when (!cancellationToken.IsCancellationRequested) { throw new ImageSourceException("画像の取得が時間切れになりました。もう一度試すか、ファイルとして保存してから選んでください。", e); }
         var name = Uri.TryCreate(url, UriKind.Absolute, out var uri) ? Path.GetFileName(uri.LocalPath) : url;
         name = string.IsNullOrEmpty(name) ? url : name;
@@ -204,7 +206,13 @@ public sealed class ImagePadSession : IAsyncDisposable
         PrimLayout layout;
         try { layout = PrimLayout.Of(cfg, P); }
         catch (InvalidOperationException) { Update(s => s with { Encode = new EncodeState.Failed($"Int {spec.Ints} 個には図形が入りません。アバターの ImagePad を作り直してください。") }); return; }
-        if (layout.SpareBits < 8) { Update(s => s with { Encode = new EncodeState.Failed($"Int {spec.Ints} 個では縦横比を送る余白がありません。ビルダーで選べる数（10 / 17 / 18 / 25 / 32）で作り直してください。") }); return; }
+        if (layout.SpareBits < 8)
+        {
+            // the counts that work depend on the format (format 3 starts at 10, format 6 at 11), so ask the format
+            var good = string.Join(" / ", spec.Format.GoodIntCounts());
+            Update(s => s with { Encode = new EncodeState.Failed($"Int {spec.Ints} 個では縦横比を送る余白がありません。この形式で使える数（{good}）で作り直してください。") });
+            return;
+        }
         Update(s => s with { Encode = new EncodeState.Running(0, cfg.MaxPrims) });
         EncodeTask = Task.Run(() =>
         {

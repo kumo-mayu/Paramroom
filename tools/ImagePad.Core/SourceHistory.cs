@@ -40,7 +40,12 @@ public sealed class JsonFileHistory(string path) : ISourceHistory
 
     public IReadOnlyList<HistoryEntry> Load()
     {
-        try { return File.Exists(path) ? JsonSerializer.Deserialize<List<HistoryEntry>>(File.ReadAllText(path), Options) ?? new() : new(); }
+        // a hand-edited file can contain nulls or entries without a value; drop them rather than hand them to the UI
+        try
+        {
+            var list = File.Exists(path) ? JsonSerializer.Deserialize<List<HistoryEntry>>(File.ReadAllText(path), Options) : null;
+            return list?.Where(e => e is not null && !string.IsNullOrEmpty(e.Value)).ToList() ?? new List<HistoryEntry>();
+        }
         // a broken file only loses the history; the app must still start
         catch (Exception e) when (e is JsonException or IOException or UnauthorizedAccessException) { return Array.Empty<HistoryEntry>(); }
     }

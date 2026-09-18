@@ -1,5 +1,11 @@
 // Fast port of the prim encoder (sim/codecs/prim.js, rotated ellipses, layout s = 1) producing the same wire format.
 //
+// What "the same" means here: the packets have the same layout and the decoder draws exactly the same picture from
+// them (sim/verify-cs.js compares the C# canvas with the JS decoder's render: max difference 0). The chosen primitives
+// are NOT bit-identical to the JS encoder's, and cannot be: the climbs run in parallel from separate RNG streams and
+// the sums are accumulated in a different order. Quality matches (msssim 0.8747 vs 0.8729 on the same image), and the
+// output is deterministic for a given seed and independent of the thread count.
+//
 // Same greedy search as the JS encoder (error-weighted random candidates, hill climbing of the best few, polish), with
 // these speed-ups:
 //   - candidate scoring in O(rows) instead of O(pixels): an ellipse covers one contiguous pixel run per row (computed

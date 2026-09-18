@@ -111,7 +111,9 @@ public static class OscSender
         }).ToArray()).ToArray();
         bool stop = false;
         Console.CancelKeyPress += (_, e) => { e.Cancel = true; stop = true; };
-        timeBeginPeriod(1);
+        // winmm is Windows only; the library targets net9.0 (not net9.0-windows), so guard it like TimerResolution does
+        bool timer = OperatingSystem.IsWindows();
+        if (timer) timeBeginPeriod(1);
         try
         {
             var sw = Stopwatch.StartNew();
@@ -127,7 +129,7 @@ public static class OscSender
             }
             Console.WriteLine();
         }
-        finally { timeEndPeriod(1); }
+        finally { if (timer) timeEndPeriod(1); }
     }
 }
 

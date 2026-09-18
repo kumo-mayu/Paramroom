@@ -522,6 +522,7 @@ node shape-sheets.js <outDir> <image> <variants> <fracs># 比較画像
 
 当てはめ直しで図形どうしの依存が強まるため、送信順の最適解が変わる可能性を疑ったが、
 **順位は現行（base）とまったく同じだった** [実測: `sim/order-eval.js` → `sim/results/ordereval.md`]。
+**この節だけ条件が違う**（4 枚・3 シード）ので、§9 の表（6 枚・2 シード）と数値は直接比べられない。
 
 | 参加の仕方 | 20 秒時点の最良 | 現行 fast+sqrt/8 |
 |---|---|---|
@@ -532,7 +533,7 @@ node shape-sheets.js <outDir> <image> <variants> <fracs># 比較画像
 3 者のバランスで `fast+sqrt/8` を選んだ以前の判断は妥当。ただし**人の出入りが多い場所では `fast+sqrt/4`**
 （埋め草を 8 回に 1 回から 4 回に 1 回へ）のほうが良い可能性があり、選択肢として記録しておく [実測]。
 
-## 17. 1024 キャンバスは今も必要か [実測: `sim/big-compare.js`, `sim/big-sheets.js`]
+## 17. 1024 キャンバスは今も必要か [実測: `sim/big-compare.js` → `sim/results/bigcompare.md`（画像全体）、`sim/big-sheets.js`（文字部分。数値は画像 `measure/results/2026-09-18/repr/*-1024.png` に焼き込まれている）]
 
 2026-09-17 の比較では「1024/4000 なら文字がほぼ元画像並み」だったので、符号化器の改良を入れた今も
 1024 が要るのかを測り直した。パケット数は 512 と同じ 1001 個（= 通信量は同じ）、

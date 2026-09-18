@@ -229,7 +229,8 @@ Shader "ImagePad/PrimDecoder"
                 uint unitBits = (uint)_U, k = (uint)_K, k0 = (uint)_K0, n = (uint)_NPrims;
                 uint lastByte = clamp((uint)_ByteCount, 1u, 32u) - 1;
                 uint primBits = 2 * (uint)_CB + 2 * (uint)_RB + (uint)_AB + (uint)_CR + (uint)_CG + (uint)_CBL + (uint)_ABITS;
-                uint nBatches = (n + (uint)_BatchSize - 1) / (uint)_BatchSize;
+                uint batch = (uint)max(1.0, _BatchSize);   // guard: _BatchSize can be edited on the material
+                uint nBatches = (n + batch - 1) / batch;
 
                 // ---- packet
                 uint epoch = PacketBits(0, 2);
@@ -307,7 +308,7 @@ Shader "ImagePad/PrimDecoder"
                     if (px >= C)
                     {
                         // display: at s == 0 the work canvas is complete (a redraw just finished, or idle)
-                        if (reset) return float4(0.5, 0.5, 0.5, 1);
+                        if (reset) return float4(128, 128, 128, 1); // canvases hold 0..255 (the display shader divides by 255)
                         return s == 0 ? Load(px - C, py) : Load(px, py);
                     }
                     if (!reset && !drawing) return Load(px, py); // idle: nothing changed
@@ -320,7 +321,7 @@ Shader "ImagePad/PrimDecoder"
                     }
                     else c = Load(px, py).rgb;
                     if (reset) return float4(c, 1);
-                    uint j0 = s * (uint)_BatchSize, j1 = min(n, j0 + (uint)_BatchSize);
+                    uint j0 = s * batch, j1 = min(n, j0 + batch);
                     for (uint j = j0; j < j1; j++) c = DrawPrim(j, c, x, y);
                     return float4(c, 1);
                 }

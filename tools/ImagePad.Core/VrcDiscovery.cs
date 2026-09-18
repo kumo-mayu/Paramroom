@@ -22,6 +22,24 @@ public sealed record DecoderFormatInfo(int R, int N, int Cb, int Rb, int Ab, int
 
     public PrimConfig Config(int maxPrims) => new() { R = R, MaxPrims = maxPrims, LayoutPrims = N, Cb = Cb, Rb = Rb, Ab = Ab, Col = Col, ABits = ABits };
 
+    // The Int counts a prefab can be built with: the smallest count for each number of primitives per packet, and only
+    // those that still leave 8 spare bits for the aspect code. Same rule as ImagePadPrimBuilder.GoodLayouts, so an
+    // error message can name the counts that actually work for THIS format (they differ: format 3 starts at 10,
+    // format 6 at 11).
+    public IEnumerable<int> GoodIntCounts()
+    {
+        int prevK = -1;
+        for (int b = 1; b <= VrcDiscovery.MaxParams; b++)
+        {
+            PrimLayout l;
+            try { l = PrimLayout.Of(Config(N), 8 * b - 2); }
+            catch (InvalidOperationException) { continue; }
+            if (l.SpareBits < 8 || l.K == prevK) continue;
+            prevK = l.K;
+            yield return b;
+        }
+    }
+
     public bool SameFields(DecoderFormatInfo o) => R == o.R && N == o.N && Cb == o.Cb && Rb == o.Rb && Ab == o.Ab && ABits == o.ABits && Col.SequenceEqual(o.Col);
 }
 
@@ -38,7 +56,7 @@ public static class DecoderFormat
         [5] = new(512, 5000, 8, 6, 5, C444, 2, "ImagePadPrimDecoder512Light5000", "512px・図形 5000 個（軽量）"),
         // 1024 canvas: the coordinates take 10 bits and the angle 5, so the primitive stays at 59 bits and the packet
         // keeps 8 spare bits for the aspect code (docs/research/08 §17). Built to measure the GPU cost in VRChat.
-        [6] = new(1024, 4000, 10, 8, 5, C565, 2, "ImagePadPrimDecoder1024", "1024px・図形 4000 個"),
+        [6] = new(1024, 4000, 10, 8, 5, C565, 2, "ImagePadPrimDecoder1024", "1024px・図形 4000 個（実験用）"),
     };
 
     // what is assumed when the avatar does not tell (prefabs before ImagePad_Format)

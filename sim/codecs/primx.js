@@ -177,6 +177,13 @@ function makeGeom(cfg) {
 }
 
 const colVal = (q, b) => q * 255 / ((1 << b) - 1);
+// cfg.ycc: keep the canvas and the primitive colours in YCbCr instead of RGB, so the bits can be split the way the
+// metric weights the channels (Y 6 : Cb 5 : Cr 5 instead of R5 G6 B5). The decoder converts once when it displays the
+// canvas, which is one matrix multiply per output pixel (docs/research/08 §22).
+const rgb2ycc = (r, g, b) => [0.299 * r + 0.587 * g + 0.114 * b,
+  -0.168736 * r - 0.331264 * g + 0.5 * b + 128,
+  0.5 * r - 0.418688 * g - 0.081312 * b + 128];
+const ycc2rgb = (y, cb, cr) => [y + 1.402 * (cr - 128), y - 0.344136 * (cb - 128) - 0.714136 * (cr - 128), y + 1.772 * (cb - 128)];
 // cfg.blend = 'add': a primitive adds (signed colour x kernel weight) to the canvas instead of blending over it, so the
 // result does not depend on the order the primitives are drawn in (GaussianImage's "accumulated blending"). The code is
 // signed and square-law: fine steps near 0 (most splats are small corrections), coarse at the extremes.
@@ -216,10 +223,11 @@ function cfgOf(o) {
     : o.shape === 'cap' ? `k${o.cb}.${o.rb}.${o.ab}`
     : o.shape === 'mix' ? `m${o.cb}.${o.rb}.${o.ab}`
     : o.shape === 'tri' ? `t${o.cb}` : `q${o.cb}`;
+  const ycc = o.ycc ? '-ycc' : '';
   const soft = (o.soft ? '-s' + o.soft.map(([q, w]) => `${q}:${w}`).join('_') : '') + (o.circle ? '-circ' : '') + (o.blend === 'add' ? '-add' : '')
     + (o.radPow && o.radPow !== 2 ? `-rp${o.radPow}` : '') + (o.alphaSet ? '-al' + o.alphaSet.join('_') : '')
-    + (o.refine ? `-rf${o.refine.sweeps || 1}${o.refine.from ? 'f' + o.refine.from : ''}${o.refine.restart ? 'r' + o.refine.restart : ''}${o.refine.pattern ? 'p' : ''}` : '');
-  const label = `${geo}-c${col.join('')}a${o.aBits || 0}-r${o.R}-n${o.maxPrims}${soft}`;
+    + (o.refine ? `-rf${o.refine.sweeps || 1}${o.refine.from ? 'f' + o.refine.from : ''}${o.refine.restart ? 'r' + o.refine.restart : ''}${o.refine.group ? 'g' + o.refine.group : ''}${o.refine.pattern ? 'p' : ''}` : '');
+  const label = `${geo}-c${col.join('')}a${o.aBits || 0}-r${o.R}-n${o.maxPrims}${ycc}${soft}`;
   return { alpha: 0.5, ...o, col, label };
 }
 
@@ -282,6 +290,10 @@ module.exports = {
     const R = cfg.R, NP = R * R;
     const G = makeGeom(cfg);
     const tgt = Float64Array.from(I.resize(ref, R, R).data);
+    if (cfg.ycc) for (let i = 0; i < tgt.length; i += 3) {
+      const v = rgb2ycc(tgt[i], tgt[i + 1], tgt[i + 2]);
+      tgt[i] = v[0]; tgt[i + 1] = v[1]; tgt[i + 2] = v[2];
+    }
     const cur = new Float64Array(NP * 3);
     const rnd = T.mulberry32(cfg.seed || 0x5eed);
     const ng = L.ng, gw = L.widths.slice(0, ng), gmax = gw.map(b => (1 << b) - 1);
@@ -296,7 +308,8 @@ module.exports = {
     const mean = [0, 0, 0];
     for (let i = 0; i < NP * 3; i++) mean[i % 3] += tgt[i] / NP;
     const bg = bg565(mean);
-    if (base) cur.set(I.resize(base, R, R).data); else for (let i = 0; i < NP * 3; i++) cur[i] = bg.rgb[i % 3];
+    const bgCanvas = cfg.ycc ? rgb2ycc(bg.rgb[0], bg.rgb[1], bg.rgb[2]) : bg.rgb;
+    if (base) cur.set(I.resize(base, R, R).data); else for (let i = 0; i < NP * 3; i++) cur[i] = bgCanvas[i % 3];
     const initCanvas = cfg.refine ? Float64Array.from(cur) : null; // the canvas every replay starts from
 
     const idx = new Int32Array(NP);
@@ -316,6 +329,34 @@ module.exports = {
       if (n === 0) { out[0] = 0; out[1] = out[2] = out[3] = 0; return 0; }
       return (add ? scoreSumsAdd(n, out) : scoreSums(n, out)) * st * st;
     }
+    // exact copy of prim.js scoreSums (same expressions in the same order)
+    function scoreSumsPlain(n, out) {
+      S.fill(0);
+      for (let i = 0; i < n; i++) {
+        const o = idx[i] * 3;
+        for (let ch = 0; ch < 3; ch++) {
+          const c = cur[o + ch], d = tgt[o + ch] - c, b = ch * 5;
+          S[b] += d; S[b + 1] += d * c; S[b + 2] += c; S[b + 3] += c * c; S[b + 4] += d * d;
+        }
+      }
+      let best = Infinity;
+      for (let q = 0; q < nAlpha; q++) {
+        const a = alphas[q];
+        let tot = 0;
+        const cc = [0, 0, 0];
+        for (let ch = 0; ch < 3; ch++) {
+          const b = ch * 5, Sd = S[b], Sdc = S[b + 1], Sc = S[b + 2], Scc = S[b + 3];
+          let col = Sc / n + Sd / (a * n);
+          col = col < 0 ? 0 : col > 255 ? 255 : col;
+          const lv = cLv[ch], qc = Math.round(col / 255 * lv), v = qc * 255 / lv;
+          cc[ch] = qc;
+          tot += -2 * a * (v * Sd - Sdc) + a * a * (n * v * v - 2 * v * Sc + Scc);
+        }
+        if (tot < best) { best = tot; out[0] = q; out[1] = cc[0]; out[2] = cc[1]; out[3] = cc[2]; }
+      }
+      return best;
+    }
+
     // Sums with the per-pixel coverage weight w (1 for a hard edge). With k = alpha * w the change in squared error of
     // painting colour v is  -2 v (a S1) + 2 (a S2) + v^2 (a^2 S3) - 2 v (a^2 S4) + (a^2 S5),
     // where S1 = sum w d, S2 = sum w d c, S3 = sum w^2, S4 = sum w^2 c, S5 = sum w^2 c^2 (d = target - canvas).
@@ -341,9 +382,13 @@ module.exports = {
     }
 
     function scoreSums(n, out) {
+      // Without weights this must reproduce prim.js bit for bit, including the order of the arithmetic: the greedy
+      // search compares candidates whose scores can be equal to the last bit, so a different rounding changes which
+      // one wins and the whole sequence diverges from the reference codec.
+      if (!wBuf) return scoreSumsPlain(n, out);
       S.fill(0);
       for (let i = 0; i < n; i++) {
-        const o = idx[i] * 3, w = wBuf ? wBuf[i] : 1, w2 = w * w;
+        const o = idx[i] * 3, w = wBuf[i], w2 = w * w;
         for (let ch = 0; ch < 3; ch++) {
           const c = cur[o + ch], d = tgt[o + ch] - c, b = ch * 5;
           S[b] += w * d; S[b + 1] += w * d * c; S[b + 2] += w2; S[b + 3] += w2 * c; S[b + 4] += w2 * c * c;
@@ -571,8 +616,13 @@ module.exports = {
       // cannot make.
       const restartFrac = cfg.refine.restart || 0;
       const nRandR = cfg.refine.nRandR || 120;
-      const candsR = restartFrac ? Array.from({ length: nRandR }, () => ({ codes: new Int32Array(ng), d: 0, r: new Int32Array(4) })) : null;
+      const candsR = (restartFrac || cfg.refine.group) ? Array.from({ length: nRandR }, () => ({ codes: new Int32Array(ng), d: 0, r: new Int32Array(4) })) : null;
       let restartCut = -Infinity, restarted = 0;
+      // cfg.refine.group: fraction of the packets (the weakest ones) whose primitives are replaced as a group
+      const groupFrac = cfg.refine.group || 0;
+      const groupK = groupFrac ? L.k : 0;
+      let groupCut = -Infinity, regrouped = 0;
+      const unitGain = [];
       for (let sweep = 0; sweep < sweeps; sweep++) {
         if (restartFrac) {
           // where is the final image still wrong? (the sampler randomShape() uses) and which primitives are worthless?
@@ -581,6 +631,19 @@ module.exports = {
           buildCum();
           const sorted = hist.slice().sort((x, y) => x - y);
           restartCut = sorted[Math.min(sorted.length - 1, Math.round(restartFrac * sorted.length))];
+        }
+        if (groupK) {
+          cur.set(initCanvas);
+          for (const p of prims) applyPrim(cur, p);
+          buildCum();
+          unitGain.length = 0;
+          for (let i = 0; i < prims.length; i += groupK) {
+            let g2 = 0;
+            for (let j = 0; j < groupK && i + j < prims.length; j++) g2 += hist[i + j];
+            unitGain.push(g2);
+          }
+          const su = unitGain.slice().sort((x, y) => x - y);
+          groupCut = su[Math.min(su.length - 1, Math.round(groupFrac * su.length))];
         }
         P.set(initCanvas);
         rebuildSuffix(1);                       // (A, V) for the primitives after index 0
@@ -647,6 +710,31 @@ module.exports = {
               }
             };
             if (cfg.refine.pattern) patternFrom(c); else climbFrom(c);
+            // cfg.refine.group: replace a whole packet's worth of primitives at once. A single small primitive cannot
+            // do much on its own, so moving one at a time rarely finds a better place; k of them together can cover a
+            // region the greedy pass never reached. The group is seeded greedily (each new one against what the earlier
+            // ones left), and the normal per-index pass afterwards fixes the interactions exactly (docs/research/08 §23).
+            if (groupK && i % groupK === 0 && unitGain[i / groupK | 0] <= groupCut) {
+              const save = [];
+              for (let j = 0; j < groupK && i + j < prims.length; j++) save.push({ codes: prims[i + j].codes.slice(), r: prims[i + j].r.slice() });
+              const Pg = Float64Array.from(P);
+              let before = 0;
+              for (let j = 0; j < save.length; j++) before += evalRefine(prims[i + j].codes, tr) , applyPrim(P, prims[i + j]);
+              P.set(Pg);
+              let after = 0;
+              const fresh = [];
+              for (let j = 0; j < save.length; j++) {
+                for (const cd of candsR) { randomShape(cd.codes); cd.d = evalRefine(cd.codes, cd.r); }
+                candsR.sort((x, y) => x.d - y.d);
+                const x = { codes: candsR[0].codes.slice(), d: candsR[0].d, r: candsR[0].r.slice() };
+                climbFrom(x);
+                fresh.push(x); after += x.d;
+                applyPrim(P, x);
+              }
+              P.set(Pg);
+              if (after < before) { for (let j = 0; j < fresh.length; j++) { prims[i + j].codes.set(fresh[j].codes); prims[i + j].r.set(fresh[j].r); } regrouped++; }
+              else for (let j = 0; j < save.length; j++) { prims[i + j].codes.set(save[j].codes); prims[i + j].r.set(save[j].r); }
+            }
             if (restartFrac && hist[i] <= restartCut) {
               for (const cd of candsR) { randomShape(cd.codes); cd.d = evalRefine(cd.codes, cd.r); }
               candsR.sort((x, y) => x.d - y.d);
@@ -738,7 +826,8 @@ module.exports = {
       },
       render(base) {
         const cur = new Float64Array(R * R * 3);
-        const bg = store[0] ? from565(new BitReader(store[0]).read(16)) : [128, 128, 128];
+        const bgRgb = store[0] ? from565(new BitReader(store[0]).read(16)) : [128, 128, 128];
+        const bg = cfg.ycc ? rgb2ycc(bgRgb[0], bgRgb[1], bgRgb[2]) : bgRgb;
         if (base) cur.set(I.resize(base, R, R).data); else for (let i = 0; i < cur.length; i++) cur[i] = bg[i % 3];
         const idx = new Int32Array(R * R), g = new Float64Array(6), codes = new Int32Array(ng);
         for (let j = 0; j < L.maxPrims; j++) {
@@ -761,6 +850,10 @@ module.exports = {
           const n = G.raster(g, idx, 1, wBuf);
           if (cfg.blend === 'add') blendAdd(cur, idx, n, rgb, wBuf);
           else blend(cur, idx, n, rgb, a, wBuf);
+        }
+        if (cfg.ycc) for (let i = 0; i < cur.length; i += 3) {
+          const v = ycc2rgb(cur[i], cur[i + 1], cur[i + 2]);
+          cur[i] = v[0]; cur[i + 1] = v[1]; cur[i + 2] = v[2];
         }
         return I.quantize8(I.resize({ w: R, h: R, c: 3, data: cur }, cfg.out || 256, cfg.out || 256)); // cfg.out: display size (default 256)
       },

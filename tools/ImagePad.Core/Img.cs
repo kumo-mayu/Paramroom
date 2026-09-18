@@ -17,15 +17,28 @@ public sealed class Img
         return Load(s);
     }
 
+    // An image is kept at 8 bytes per channel while it is loaded, so a huge one (a 4 MB PNG can be 12000x12000)
+    // would take gigabytes. Nothing here needs more than the canvas, so anything past the limit is refused with a
+    // message that says why, instead of ending as an out-of-memory error.
+    public const int MaxPixels = 64_000_000;   // 64 Mpx, e.g. 8000x8000
+
     public static Img Load(Stream s)
     {
         var r = ImageResult.FromStream(s, ColorComponents.RedGreenBlueAlpha);
+        CheckSize(r.Width, r.Height);
         return FromRgba(r.Data, r.Width, r.Height);
+    }
+
+    public static void CheckSize(int w, int h)
+    {
+        if ((long)w * h > MaxPixels)
+            throw new InvalidOperationException($"画像が大きすぎます（{w}x{h} = {(long)w * h / 1_000_000} メガ画素）。{MaxPixels / 1_000_000} メガ画素までにしてください。");
     }
 
     // 8-bit RGBA rows top-down, alpha composited on white
     public static Img FromRgba(byte[] rgba, int w, int h)
     {
+        CheckSize(w, h);
         var img = new Img(w, h);
         for (int i = 0, j = 0; i < w * h; i++, j += 4)
         {

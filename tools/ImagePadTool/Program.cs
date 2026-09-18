@@ -4,14 +4,15 @@
 //                           [--client <name part | OSC port>] [--wait 3] [--R 512 --n 4000] [--force] [--seed N]
 //                           [--host 127.0.0.1 --port 9000] [--no-bundle]
 //   imagepad send   --units units.json [...]                  (send a previously encoded image)
-//   imagepad encode <image> [--R 512 --n 4000 | --format 3] [--fit ...] [--out units.json] [--png canvas.png]
+//   imagepad encode <image> [--R 512 --n 4000 | --format 3..6] [--fit ...] [--out units.json] [--png canvas.png]
 //   imagepad list                                             (VRChat clients found with OSCQuery)
 //
 // Destination: by default the VRChat client is found with OSCQuery (vrc-oscquery-lib): the client whose current avatar
 // has the Int parameters D0..D31. With several such clients pick one with --client. --port (and --host) send to a fixed
 // address instead (no OSCQuery).
-// Decoder variant: the prefab's local-only parameter ImagePad_Format (1 = 256/1000, 2 = 512/2000, 3 = 512/4000) and the
-// number of synced Int parameters D0..D(B-1) (the prefab builder offers B = 10/17/18/25/32 depending on the format) are
+// Decoder variant: the prefab's local-only parameter ImagePad_Format (1 = 256/1000, 2 = 512/2000, 3 = 512/4000,
+// 4 = 512/4000 light, 5 = 512/5000 light, 6 = 1024/4000) and the number of synced Int parameters D0..D(B-1) (the good
+// counts differ per format: 10/18/25/32 for format 3, 9/15/21/26/32 for 4, 9/15/21/27/32 for 5, 11/18/25/32 for 6) are
 // read with OSCQuery and select the canvas, the primitive capacity (unit layout) and the packet size automatically.
 // --n below the capacity encodes fewer primitives with the same layout (fewer units, the decoder skips missing ones).
 // Without OSCQuery data (older prefabs, --port) the defaults are 512/4000 and 32 Int, or --R / --n / --bytes; data that
@@ -19,6 +20,14 @@
 using System.Globalization;
 using System.Text.Json;
 using ImagePad;
+
+// Without this an unexpected exception prints a stack trace that contains the paths of the machine this was built
+// on. Exit inside the handler so the runtime does not print it afterwards.
+AppDomain.CurrentDomain.UnhandledException += (_, e) =>
+{
+    Console.Error.WriteLine("エラー: " + ((e.ExceptionObject as Exception)?.Message ?? e.ExceptionObject.ToString()));
+    Environment.Exit(2);
+};
 
 var argv = args.ToList();
 if (argv.Count == 0 || (argv[0] != "send" && argv[0] != "encode" && argv[0] != "list"))
@@ -111,7 +120,10 @@ else
     aspect = fit == "crop" ? Aspect.Code(1, 1) : Aspect.Code(img.W, img.H);
     if (fit == "crop") { int s = Math.Min(img.W, img.H); img = img.Crop((img.W - s) >> 1, (img.H - s) >> 1, s, s); }
     img = img.Resize(R, R);
-    var cfg = avatarFormat is { } fmt && fmt.R == R ? fmt.Config(n) : new PrimConfig { R = R, MaxPrims = n, LayoutPrims = capacity, Cb = R >= 1024 ? 10 : 9 };
+    // At 1024 the coordinates need 10 bits, and the angle has to give one back (5) or the packet loses the 8 spare
+    // bits the aspect code needs - that is what decoder format 6 does, so --R 1024 matches it by default.
+    var cfg = avatarFormat is { } fmt && fmt.R == R ? fmt.Config(n)
+        : new PrimConfig { R = R, MaxPrims = n, LayoutPrims = capacity, Cb = R >= 1024 ? 10 : 9, Ab = R >= 1024 ? 5 : 6 };
     // precision experiments (bits per field); the avatar decoder must be built with the same widths
     if (Opt("cb") is string ocb) cfg.Cb = int.Parse(ocb);
     if (Opt("rb") is string orb) cfg.Rb = int.Parse(orb);

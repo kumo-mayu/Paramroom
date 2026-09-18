@@ -106,19 +106,26 @@ if (cmd === 'encode') {
   fs.writeFileSync(out, lines.join('\n'));
   console.log(lines.join('\n'));
 } else if (cmd === 'summary') {
-  const rows = fs.readFileSync(outFile, 'utf8').trim().split('\n').map(JSON.parse);
+  // The jsonl is append-only and a re-run adds new rows, so keep only the last row of each (image, variant, frac) -
+  // otherwise a variant that was measured twice is counted twice and its average is wrong. Images whose name ends in
+  // _full belong to a separate study (a whole page stretched into the canvas, docs/research/08 §17).
+  const all = fs.readFileSync(outFile, 'utf8').trim().split('\n').map(JSON.parse).filter(r => !r.image.endsWith('_full'));
+  const dedup = new Map();
+  for (const r of all) dedup.set(`${r.image}|${r.variant}|${r.frac}`, r);
+  const rows = [...dedup.values()];
   const images = [...new Set(rows.map(r => r.image))];
   const vars = Object.keys(VARIANTS).filter(v => rows.some(r => r.variant === v));
   const mean = a => a.reduce((x, y) => x + y, 0) / a.length;
   const get = (v, f) => rows.filter(r => r.variant === v && r.frac === f);
   const lines = ['# パケット数を揃えた図形表現の比較', '',
-    `画像 ${images.length} 枚、キャンバス ${R}、パケット ${UNITS + 1} 個（= 現行 512/4000 と同じ通信量）。MS-SSIM (YCbCr 6:1:1)。`,
+    `キャンバス ${R}、パケット ${UNITS + 1} 個（= 現行 512/4000 と同じ通信量）。MS-SSIM (YCbCr 6:1:1)。`,
     'f は「誤差削減の大きいパケットから f 割合だけ届いた状態」。', '',
-    '| 表現 | 1 図形 | 図形数 | ' + FRACS.map(f => `f=${f}`).join(' | ') + ' | 符号化時間 |',
-    '|---|---:|---:|' + FRACS.map(() => '---:').join('|') + '|---:|'];
+    '**行ごとに平均した画像の枚数が違う**（後から枚数を増やした表現がある）ので、枚数の列を必ず見ること。', '',
+    '| 表現 | 1 図形 | 図形数 | 枚数 | ' + FRACS.map(f => `f=${f}`).join(' | ') + ' | 符号化時間 |',
+    '|---|---:|---:|---:|' + FRACS.map(() => '---:').join('|') + '|---:|'];
   for (const v of vars) {
     const one = get(v, 1);
-    lines.push(`| ${v} | ${one[0].primBits} bit | ${one[0].prims} | ` +
+    lines.push(`| ${v} | ${one[0].primBits} bit | ${one[0].prims} | ${one.length} | ` +
       FRACS.map(f => { const g = get(v, f); return g.length ? mean(g.map(r => r.q)).toFixed(4) : '-'; }).join(' | ') +
       ` | ${mean(one.map(r => r.encSec)).toFixed(0)} s |`);
   }

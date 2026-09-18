@@ -428,12 +428,16 @@ public sealed class MainViewModel : ViewModelBase
         string where = $"VRChat（ポート {c.OscPort}）";
         if (!ImagePadSession.IsUsable(c)) return $"{where}：ImagePad なし";
         var spec = DecoderSpec.For(c);
-        return $"{where}：{spec.Format.Name}・Int {spec.Ints} 個{(spec.Assumed ? "（種類不明）" : "")}";
+        var note = spec.Unknown ? $"（形式 {spec.FormatId} は未対応）" : spec.Assumed ? "（種類不明）" : "";
+        return $"{where}：{spec.Format.Name}・Int {spec.Ints} 個{note}";
     }
 
     static string TargetDetail(VrcClient c)
     {
         var spec = DecoderSpec.For(c);
+        if (spec.Unknown)
+            return $"送信先：VRChat（ポート {c.OscPort}）。アバターは形式 {spec.FormatId} と言っていますが、このアプリはそれを知りません（アプリのほうが古い可能性があります）。"
+                 + $"512px・図形 4000 個として送りますが、絵は正しく出ません。";
         return spec.Assumed
             ? $"送信先：VRChat（ポート {c.OscPort}）。アバターの種類が読めないため、512px・図形 4000 個・Int {spec.Ints} 個として送ります。"
             : $"送信先：VRChat（ポート {c.OscPort}）。アバターは {spec.Format.Name}・Int {spec.Ints} 個に対応しています。";
