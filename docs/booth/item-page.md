@@ -15,8 +15,8 @@
 | 商品名 | 【無料】PARAMROOM - アバターに画像を送信するツール（版番号は入れない） |
 | カテゴリ | ソフトウェア |
 | 年齢制限 | 全年齢 |
-| バリエーション 1 | 無料版（¥0）… `Paramroom-v0.2.1.zip` |
-| バリエーション 2 | 支援版(中身は同じ)（¥500）… 同じ `Paramroom-v0.2.1.zip` |
+| バリエーション 1 | 無料版（¥0）… `Paramroom-v0.2.2.zip` |
+| バリエーション 2 | 支援版(中身は同じ)（¥500）… 同じ `Paramroom-v0.2.2.zip` |
 | タグ | 無料, ツール, VRChat, OSC, ModularAvatar, カスタムシェーダー |
 | 見出しの順（実際のページ） | 本文 → 同梱物 → 基本的な使用方法 → 購入前の注意 → 消費する同期パラメータ → 形式ごとの速さ → Windows の警告について → 利用規約 → よくある質問 → クレジット → 動作確認環境 → 更新履歴 → お問い合わせ（このファイルの並びとは違う） |
 
@@ -54,8 +54,8 @@ https://github.com/kumo-mayu/Paramroom
 ## 同梱物(最新版)
 
 ```
-- Paramroom-v0.2.1.zip
---- Paramroom-unity-v0.2.1.unitypackage（アバターへの導入ツール）
+- Paramroom-v0.2.2.zip
+--- Paramroom-unity-v0.2.2.unitypackage（アバターへの導入ツール）
 --- Paramroom.App.exe（画像を送る Windows アプリ。インストール不要）
 --- README.txt
 --- LICENSE（MIT）
@@ -158,7 +158,7 @@ QR 専用で迷ったら Int 4 個にしてください。32bit だけで、短�
 
 ```
 【アバターに入れる】
-① VRChat SDK (Avatars) と Modular Avatar を入れたプロジェクトに、Paramroom-unity-v0.2.1.unitypackage をインポートする（Assets/kumo-mayu/Paramroom に入ります）
+① VRChat SDK (Avatars) と Modular Avatar を入れたプロジェクトに、Paramroom-unity-v0.2.2.unitypackage をインポートする（Assets/kumo-mayu/Paramroom に入ります）
 ② ヒエラルキーで導入したいアバターを選ぶ
 ③「Tools > Paramroom > Decoder Builder」を開く。アバターの同期ビットの空きが表示されるので、収まる Int の数を選んで「プレハブを作成」を押す（迷ったら最初に選ばれている 形式 4 ＋ Int 32 個）
 ④ 生成された Assets/kumo-mayu/Paramroom/ParamroomDecoder*.prefab をアバターの直下に置く
@@ -283,6 +283,11 @@ https://booth.pm/ja/items/6571299
 2026/09/18 v0.2.1 【アバターの作り直しは不要】
 - おすすめの構成を 形式 4 ＋ Int 32 個 にした（ビルダーで最初から選ばれる）
 - BOOTH で配布を始めた
+
+2026/09/19 v0.2.2 【アバターの作り直しは不要】
+- Paramroom の入っていないアバターを着ていると、送信アプリが 10 秒ごとに VRChat へ接続し直していた不具合を直した
+- アバターを着替えると、数秒で送信先が切り替わるようになった
+- 説明文を直した（画像は 80 秒ほどでほぼ揃い、全部揃うまでは 90 秒ほど）
 ```
 
 ## お問い合わせ

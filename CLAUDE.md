@@ -94,6 +94,8 @@ VRChat は OSC バンドルを 1 フレームで適用しきれないことが�
 - ライブラリは「見つけた」しか知らせないので、終了した VRChat の古い登録が残る。
   応答しないものは一覧から外す
 - `ConnectionTests` がこれを見ている（偽の OSCQuery サーバーで、探し直した回数を数える）
+- 実機で確認済み（2026-09-19、ユーザー）：名乗り直しが止まる／Paramroom 入りに着替えると**数秒**で送信先になる
+  （10 秒の見回りより速いので /avatar/change が届いていると見られる）／送信中の着替えで止まる／VRChat 再起動で見つけ直す
 
 ### 参照実装とビット単位で一致させる
 
@@ -244,6 +246,9 @@ THIRD-PARTY-NOTICES.txt・README.txt・BOOTH 用の zip がまとめてできる
 - **unitypackage の GUID は前の版から引き継ぐ。** リポジトリに `.meta` が無いので、スクリプトは
   前の版の unitypackage を土台に中身だけ差し替える。GUID が変わると上書きされず、
   生成済みのプレハブがシェーダーを見失う。ファイルを足したときは Unity で書き出す
+- **公開したら、添付物がスクリプトの出力と同じかをハッシュで突き合わせる**（`gh release download` して `sha256sum`）。
+  v0.2.1 では、GitHub に v0.2.0 と同じ unitypackage が付き、THIRD-PARTY-NOTICES.txt も付いていなかった
+  （2026-09-19 に v0.2.2 の準備中に気づき、v0.2.2 のノートで訂正した）
 - exe は `IncludeNativeLibrariesForSelfExtract` と `EnableCompressionInSingleFile` を付けて作る。
   無いと WPF のネイティブ DLL が外に出て、exe 1 つでは起動できない
 
