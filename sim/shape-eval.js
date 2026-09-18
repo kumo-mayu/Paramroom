@@ -16,14 +16,17 @@ const P = 254;
 const R = Number(process.env.IMAGEPAD_R || 512);  // 512 by default; IMAGEPAD_R=1024 for the bigger canvas study
 const FRACS = [0.05, 0.15, 0.4, 1];
 
-const { VARIANTS, UNITS, cfgFor: variantCfg } = require('./lib/shape-variants');
+const { VARIANTS, cfgFor: variantCfg } = require('./lib/shape-variants');
+// IMAGEPAD_UNITS: packets of primitives (default 1000 = the 100 s cycle of today's 512/4000). Fewer packets means
+// fewer primitives but a faster cycle, which matters for people who arrive late (docs/research/08 §19).
+const UNITS = Number(process.env.IMAGEPAD_UNITS || 1000);
 
 const cacheDir = path.join(__dirname, 'cache', 'shape');
 const outFile = path.join(__dirname, 'results', 'shapeeval.jsonl');
 const [cmd, image, variant] = process.argv.slice(2);
 
-const cfgFor = name => variantCfg(name, R, P);
-const cacheFile = (img = image, v = variant) => path.join(cacheDir, `${img}-${v}${R === 512 ? '' : '-r' + R}.json`);
+const cfgFor = name => variantCfg(name, R, P, UNITS);
+const cacheFile = (img = image, v = variant) => path.join(cacheDir, `${img}-${v}${R === 512 ? '' : '-r' + R}${UNITS === 1000 ? '' : '-u' + UNITS}.json`);
 const refOf = img => I.loadPNG(path.join(__dirname, 'images', 'ref' + R, img + '.png'));
 
 if (cmd === 'encode') {

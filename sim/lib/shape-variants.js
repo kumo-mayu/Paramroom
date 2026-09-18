@@ -68,15 +68,22 @@ const VARIANTS = {
   rfx: { shape: 'ell', cb: 9, rb: 8, ab: 6, col: [5, 6, 5], aBits: 2, refine: { sweeps: 3, iters: 1200, age: 200 } },
   deepsoftrfx: { shape: 'ell', cb: 9, rb: 8, ab: 6, col: [5, 6, 5], aBits: 2, soft: SOFT3, ...DEEP, refine: { sweeps: 3, iters: 1200, age: 200 } },
   capdeeprfx: { shape: 'cap', cb: 9, rb: 8, ab: 6, col: [5, 6, 5], aBits: 2, ...DEEP, refine: { sweeps: 3, iters: 1200, age: 200 } },
+  // quantisation details that cost nothing in packets (docs/research/08 §20)
+  a3rfx: { shape: 'ell', cb: 9, rb: 8, ab: 6, col: [5, 6, 5], aBits: 3, refine: { sweeps: 3, iters: 1200, age: 200 } },
+  rp15rfx: { shape: 'ell', cb: 9, rb: 8, ab: 6, col: [5, 6, 5], aBits: 2, radPow: 1.5, refine: { sweeps: 3, iters: 1200, age: 200 } },
+  a3rp15rfx: { shape: 'ell', cb: 9, rb: 8, ab: 6, col: [5, 6, 5], aBits: 3, radPow: 1.5, refine: { sweeps: 3, iters: 1200, age: 200 } },
+  rp125rfx: { shape: 'ell', cb: 9, rb: 8, ab: 6, col: [5, 6, 5], aBits: 2, radPow: 1.25, refine: { sweeps: 3, iters: 1200, age: 200 } },
+  rp175rfx: { shape: 'ell', cb: 9, rb: 8, ab: 6, col: [5, 6, 5], aBits: 2, radPow: 1.75, refine: { sweeps: 3, iters: 1200, age: 200 } },
+  rp15deepsoftrfx: { shape: 'ell', cb: 9, rb: 8, ab: 6, col: [5, 6, 5], aBits: 2, radPow: 1.5, soft: SOFT3, ...DEEP, refine: { sweeps: 3, iters: 1200, age: 200 } },
 };
 
 // maxPrims chosen so that every variant uses the same number of units
-function cfgFor(name, R, P) {
+function cfgFor(name, R, P, units = UNITS) {
   const o = VARIANTS[name];
   if (!o) throw new Error('unknown variant: ' + name);
   const probe = { ...primx.cfgOf({ ...o, R, maxPrims: 4000 }), out: R };
   const L = primx.layout(probe, P);
-  return { ...primx.cfgOf({ ...o, R, maxPrims: L.k0 + L.k * UNITS }), out: R };
+  return { ...primx.cfgOf({ ...o, R, maxPrims: L.k0 + L.k * units }), out: R };
 }
 
 module.exports = { VARIANTS, UNITS, SOFT3, DEEP, cfgFor };

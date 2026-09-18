@@ -134,6 +134,16 @@ function sampleTimes(sampler, rnd, tEnd) {
       t += 0.07 + 0.035 * rnd();
       if (rnd() < 0.001) t += 0.3 + 0.6 * rnd();
     }
+  } else if (sampler === 'congested') {
+    // A crowded world, where remote parameter updates arrive far less often. NOT measured in game: a deliberately
+    // pessimistic model (interval ~ U[120, 300] ms, hitches 20x more common) used to ask whether an encoding that
+    // leans on primitives being complete degrades worse than one that does not (docs/research/08 §21).
+    let t = rnd() * 0.21;
+    while (t < tEnd) {
+      out.push(t);
+      t += 0.12 + 0.18 * rnd();
+      if (rnd() < 0.02) t += 0.3 + 0.6 * rnd();
+    }
   } else throw new Error('unknown sampler ' + sampler);
   return out;
 }

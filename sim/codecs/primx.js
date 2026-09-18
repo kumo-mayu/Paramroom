@@ -84,6 +84,9 @@ function primLoc(L, j) {
 // Geometry & coverage (shared by encoder and decoder so both see identical pixels)
 function makeGeom(cfg) {
   const R = cfg.R, shape = cfg.shape, soft = cfg.soft || null;
+  // cfg.radPow: how a radius code maps to pixels (r = R/2 * ((q+1)/2^rb)^radPow). 2 is what the decoders use today;
+  // a larger exponent spends more codes on small shapes, where most primitives are (docs/research/08 §20).
+  const radPow = cfg.radPow || 2;
   const cmax = (1 << cfg.cb) - 1;
   const rN = 1 << (cfg.rb || 1), aN = 1 << (cfg.ab || 1);
   // codes -> float params in canvas pixel units, into g
@@ -91,17 +94,17 @@ function makeGeom(cfg) {
     if (shape === 'cap' || shape === 'mix') {
       const o = shape === 'mix' ? 1 : 0;
       g[0] = codes[o] / cmax * R; g[1] = codes[o + 1] / cmax * R;
-      g[2] = Math.max(0.5, R / 2 * ((codes[o + 2] + 1) / rN) ** 2);
-      g[3] = Math.max(0.5, R / 2 * ((codes[o + 3] + 1) / rN) ** 2);
+      g[2] = Math.max(0.5, R / 2 * ((codes[o + 2] + 1) / rN) ** radPow);
+      g[3] = Math.max(0.5, R / 2 * ((codes[o + 3] + 1) / rN) ** radPow);
       g[4] = codes[o + 4] / aN * Math.PI;
       g[5] = shape === 'mix' ? codes[0] : 1;   // 0 = ellipse, 1 = capsule
       return;
     }
     if (shape === 'ell') {
       g[0] = codes[0] / cmax * R; g[1] = codes[1] / cmax * R;
-      g[2] = Math.max(0.5, R / 2 * ((codes[2] + 1) / rN) ** 2);
+      g[2] = Math.max(0.5, R / 2 * ((codes[2] + 1) / rN) ** radPow);
       // cfg.circle: no second radius and no angle (the 14 bits they cost buy more primitives instead)
-      g[3] = cfg.circle ? g[2] : Math.max(0.5, R / 2 * ((codes[3] + 1) / rN) ** 2);
+      g[3] = cfg.circle ? g[2] : Math.max(0.5, R / 2 * ((codes[3] + 1) / rN) ** radPow);
       g[4] = cfg.circle ? 0 : codes[4] / aN * Math.PI;
     } else {
       for (let i = 0; i < codes.length; i++) g[i] = codes[i] / cmax * R;
@@ -182,7 +185,9 @@ const addCode = (v, b, vmax) => {
   const c = ((1 << b) - 1) / 2, t = Math.sign(v) * Math.sqrt(Math.min(1, Math.abs(v) / vmax));
   return Math.max(0, Math.min((1 << b) - 1, Math.round(t * c + c)));
 };
-const alphaVal = (cfg, q) => cfg.aBits ? (q + 1) / (1 << cfg.aBits) : cfg.alpha;
+// cfg.alphaSet: explicit alpha levels instead of the even (q+1)/2^aBits spacing (docs/research/08 §20)
+const alphaVal = (cfg, q) => cfg.alphaSet ? cfg.alphaSet[Math.min(q, cfg.alphaSet.length - 1)]
+  : cfg.aBits ? (q + 1) / (1 << cfg.aBits) : cfg.alpha;
 function bg565(c) {
   const q = [Math.round(c[0] / 255 * 31), Math.round(c[1] / 255 * 63), Math.round(c[2] / 255 * 31)];
   return { code: (q[0] << 11) | (q[1] << 5) | q[2], rgb: [q[0] * 255 / 31, q[1] * 255 / 63, q[2] * 255 / 31] };
@@ -212,6 +217,7 @@ function cfgOf(o) {
     : o.shape === 'mix' ? `m${o.cb}.${o.rb}.${o.ab}`
     : o.shape === 'tri' ? `t${o.cb}` : `q${o.cb}`;
   const soft = (o.soft ? '-s' + o.soft.map(([q, w]) => `${q}:${w}`).join('_') : '') + (o.circle ? '-circ' : '') + (o.blend === 'add' ? '-add' : '')
+    + (o.radPow && o.radPow !== 2 ? `-rp${o.radPow}` : '') + (o.alphaSet ? '-al' + o.alphaSet.join('_') : '')
     + (o.refine ? `-rf${o.refine.sweeps || 1}${o.refine.from ? 'f' + o.refine.from : ''}${o.refine.restart ? 'r' + o.refine.restart : ''}${o.refine.pattern ? 'p' : ''}` : '');
   const label = `${geo}-c${col.join('')}a${o.aBits || 0}-r${o.R}-n${o.maxPrims}${soft}`;
   return { alpha: 0.5, ...o, col, label };

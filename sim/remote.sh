@@ -21,8 +21,8 @@ case "$1" in
   run)
     [ -n "$2" ] || { echo "usage: remote.sh run <jobs file>"; exit 1; }
     scp -q "$2" "$HOST:$RDIR/jobs.txt"
-    # IMAGEPAD_R (canvas size) is passed through so the 1024 study can run there as well
-    ssh "$HOST" "cd /d C:\\imagepad-sim && set IMAGEPAD_R=${IMAGEPAD_R:-512}&& node run-jobs.js $WORKERS jobs.txt"
+    # the study variables are passed through (canvas size and packet budget), so the same jobs file works on both machines
+    ssh "$HOST" "cd /d C:\\imagepad-sim && set IMAGEPAD_R=${IMAGEPAD_R:-512}&& set IMAGEPAD_UNITS=${IMAGEPAD_UNITS:-1000}&& node run-jobs.js $WORKERS jobs.txt"
     ;;
   fetch)
     [ -n "$2" ] || { echo "usage: remote.sh fetch <glob under the remote sim dir>"; exit 1; }
