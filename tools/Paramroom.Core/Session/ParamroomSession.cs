@@ -184,7 +184,7 @@ public sealed class ParamroomSession : IAsyncDisposable
     }
 
     // fewer than ~50 primitives is not a picture any more (the encoder's early stop also starts at 50)
-    public const int MinPrimCount = 50;
+    public const int MinPrimCount = 1;    // ごく少ない数も許す（何の絵か当てっこする遊びに使える）
 
     public void SetPrimCount(int? count)
     {

@@ -116,7 +116,16 @@
                             <TextBlock Text="図形の数" VerticalAlignment="Center" Margin="0,0,8,0" />
                             <ComboBox Width="220" ItemsSource="{Binding PrimCountOptions}" SelectedItem="{Binding SelectedPrimCount}" AutomationProperties.Name="図形の数" />
                         </StackPanel>
-                        <TextBlock Style="{StaticResource Note}" Text="図形を減らすと 1 周が短くなりますが、細かいところが粗くなります。" />
+                        <TextBlock Style="{StaticResource Note}" Text="図形を減らすと 1 周が短くなりますが、細かいところが粗くなります。20 個ほどにすると、何の絵か当てっこする遊びにも使えます。" />
+                        <StackPanel Orientation="Horizontal" Margin="0,6,0,0" IsEnabled="{Binding IsPicture}">
+                            <TextBlock Text="一覧に無い数" VerticalAlignment="Center" Margin="0,0,8,0" />
+                            <TextBox Width="80" Text="{Binding CustomPrimCountText, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="その他の図形の数" VerticalContentAlignment="Center">
+                                <TextBox.InputBindings>
+                                    <KeyBinding Key="Enter" Command="{Binding ApplyCustomPrimCountCommand}" />
+                                </TextBox.InputBindings>
+                            </TextBox>
+                            <Button Content="この数にする" Command="{Binding ApplyCustomPrimCountCommand}" Margin="6,0,0,0" />
+                        </StackPanel>
                         <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
                             <RadioButton Content="画像全体を送る" IsChecked="{Binding FitStretch}" GroupName="fit" Margin="0,0,16,0" IsEnabled="{Binding IsPicture}" />
                             <RadioButton Content="中央を正方形に切り抜く" IsChecked="{Binding FitCrop}" GroupName="fit" IsEnabled="{Binding IsPicture}" />

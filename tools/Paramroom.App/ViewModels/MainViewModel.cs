@@ -60,20 +60,28 @@ public sealed class MainViewModel : ViewModelBase
     };
 
     // 実測（2026-09-17、docs/measure）：受け側の更新は約 83〜100 ms ごと。100 ms で取りこぼしはほぼ 0、80 ms では 11% 落ちた
+    // 受け取る側は「同じ値が 2 フレーム続いた」ことを確かめてから取り込む（壊れた値を弾くため、
+    // docs/research/10）。余裕を見て 1 パケットが 3 フレーム映る fps を「必要な fps」として出す。
+    //   実測: 3 フレーム映れば 1 周で全部届く / 2 フレームで数個取りこぼす / 1 フレームだとほぼ届かない
+    static int NeedFps(double ms) => (int)Math.Ceiling(3000.0 / ms);
+    static HoldOption Hold(double ms, string name, string description) =>
+        new(ms, $"{ms:0} ミリ秒（{(name.Length > 0 ? name + "・" : "")}相手 {NeedFps(ms)} fps 以上）",
+            description + $" 受け取る人のフレームレートが {NeedFps(ms)} fps を下回ると、届くのが遅くなります（絵は壊れません）。");
+
     public IReadOnlyList<HoldOption> HoldOptions { get; } = new[]
     {
-        new HoldOption(67, "67 ミリ秒（速い・取りこぼしが多い）", "実測では 100 ミリ秒より短いとパケットを取りこぼしました。届く速さはあまり上がらないことがあります。"),
-        new HoldOption(83, "83 ミリ秒（やや速い）", "実測では 80 ミリ秒で 1 割ほど取りこぼしました。混んでいないワールド向けです。"),
-        new HoldOption(100, "100 ミリ秒（おすすめ）", "実測で取りこぼしがほぼ無かった間隔です。"),
-        new HoldOption(117, "117 ミリ秒", "少し余裕を持たせた間隔です。"),
-        new HoldOption(150, "150 ミリ秒（ゆっくり）", "人が多く、同期が遅れがちなワールド向けです。"),
-        new HoldOption(200, "200 ミリ秒（とてもゆっくり）", "届くのは遅くなりますが、取りこぼしはさらに起きにくくなります。"),
-        new HoldOption(250, "250 ミリ秒", "人の多いワールドで、同期が遅れているとき向けです。"),
-        new HoldOption(300, "300 ミリ秒", "人の多いワールドで、同期が遅れているとき向けです。"),
-        new HoldOption(400, "400 ミリ秒", "混雑したワールド向けです。1 周の時間は 100 ミリ秒の 4 倍かかります。"),
-        new HoldOption(500, "500 ミリ秒", "混雑したワールド向けです。1 周の時間は 100 ミリ秒の 5 倍かかります。"),
-        new HoldOption(750, "750 ミリ秒", "とても混雑したワールド向けです。"),
-        new HoldOption(1000, "1000 ミリ秒（1 秒）", "とても混雑したワールド向けです。1 周に 100 ミリ秒の 10 倍かかります。"),
+        Hold(67, "速い・取りこぼしが多い", "実測では 100 ミリ秒より短いとパケットを取りこぼしました。届く速さはあまり上がらないことがあります。"),
+        Hold(83, "やや速い", "実測では 80 ミリ秒で 1 割ほど取りこぼしました。混んでいないワールド向けです。"),
+        Hold(100, "おすすめ", "実測で取りこぼしがほぼ無かった間隔です。"),
+        Hold(117, "", "少し余裕を持たせた間隔です。"),
+        Hold(150, "ゆっくり", "人が多く、同期が遅れがちなワールド向けです。"),
+        Hold(200, "とてもゆっくり", "届くのは遅くなりますが、取りこぼしはさらに起きにくくなります。"),
+        Hold(250, "", "人の多いワールドで、同期が遅れているとき向けです。"),
+        Hold(300, "", "人の多いワールドで、同期が遅れているとき向けです。"),
+        Hold(400, "", "混雑したワールド向けです。1 周の時間は 100 ミリ秒の 4 倍かかります。"),
+        Hold(500, "", "混雑したワールド向けです。1 周の時間は 100 ミリ秒の 5 倍かかります。"),
+        Hold(750, "", "とても混雑したワールド向けです。"),
+        Hold(1000, "1 秒", "とても混雑したワールド向けです。1 周に 100 ミリ秒の 10 倍かかります。"),
     };
 
     HoldOption? selectedHold;
@@ -112,6 +120,19 @@ public sealed class MainViewModel : ViewModelBase
         new PrimCountOption(1000, "1000 個"),
         new PrimCountOption(500, "500 個"),
     };
+
+    // 一覧に無い図形数。ごく少ない数にすると「何の絵でしょう」のような遊びに使える
+    string customPrimCountText = "";
+    public string CustomPrimCountText { get => customPrimCountText; set => SetField(ref customPrimCountText, value); }
+
+    public RelayCommand ApplyCustomPrimCountCommand => applyCustomPrimCount ??= new RelayCommand(() =>
+    {
+        var t = CustomPrimCountText.Trim();
+        if (int.TryParse(t, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var n))
+            Run(new UiCommand.SetPrimCount(n));
+        else Message = "図形の数は数字で入れてください（例：40）。";
+    }, () => !string.IsNullOrWhiteSpace(CustomPrimCountText));
+    RelayCommand? applyCustomPrimCount;
 
     PrimCountOption? selectedPrimCount;
     public PrimCountOption? SelectedPrimCount

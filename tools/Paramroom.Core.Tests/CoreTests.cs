@@ -417,7 +417,10 @@ public class PrimCountTests
         await using var session = new ParamroomSession(new OneClient(), _ => throw new InvalidOperationException(), new StbImageDecoder(), new HttpImageFetcher());
         var handler = new CommandHandler(session);
         await handler.ExecuteAsync(new UiCommand.RefreshTargets());
-        Assert.IsType<CommandResult.Failed>(await handler.ExecuteAsync(new UiCommand.SetPrimCount(10)));
+        Assert.IsType<CommandResult.Failed>(await handler.ExecuteAsync(new UiCommand.SetPrimCount(0)));
+        // ごく少ない数も通る（何の絵か当てっこする遊びに使うため）
+        Assert.IsType<CommandResult.Done>(await handler.ExecuteAsync(new UiCommand.SetPrimCount(1)));
+        Assert.IsType<CommandResult.Done>(await handler.ExecuteAsync(new UiCommand.SetPrimCount(20)));
         Assert.IsType<CommandResult.Done>(await handler.ExecuteAsync(new UiCommand.SetPrimCount(200)));
         var image = new Img(256, 256);
         for (int i = 0; i < image.Data.Length; i++) image.Data[i] = (i * 37) % 251;
