@@ -411,7 +411,7 @@ public sealed class MainViewModel : ViewModelBase
                     : s.Target is { } tt ? TargetDetail(tt)
                     : s.Targets.Count == 0 ? "VRChat が見つかりません。VRChat を起動して OSC を有効にし、Paramroom 入りのアバターを着てから「探し直す」を押してください。"
                     : s.Targets.Any(ParamroomSession.IsUsable) ? "送信先を選んでください。"
-                    : "見つかった VRChat のアバターに Paramroom が入っていません。Paramroom 入りのアバターに着替えてから「探し直す」を押してください。";
+                    : "VRChat にはつながっていますが、今のアバターに Paramroom が入っていません。Paramroom 入りのアバターに着替えると、自動で送信先になります。";
             }
 
             if (old is null || old.PrimCount != s.PrimCount)

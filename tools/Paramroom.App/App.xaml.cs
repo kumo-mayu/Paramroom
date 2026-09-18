@@ -9,6 +9,7 @@ namespace Paramroom.App;
 public partial class App : Application
 {
     ParamroomSession? session;
+    ITargetFinder? finder;   // owns the OSCQuery service (VrcConnection) for the life of the app
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -21,7 +22,7 @@ public partial class App : Application
 
         // PARAMROOM_TARGET=host:port[:Int の数[:format]] を付けると、VRChat を探さず決まった宛先に送る（画面の確認用。
         // 受け側は measure/osc/check-sender.js など）。付けなければ OSCQuery で VRChat を探す
-        ITargetFinder finder = FixedTargetFinder.FromSpec(Environment.GetEnvironmentVariable("PARAMROOM_TARGET")) ?? (ITargetFinder)new OscQueryTargetFinder();
+        finder = FixedTargetFinder.FromSpec(Environment.GetEnvironmentVariable("PARAMROOM_TARGET")) ?? (ITargetFinder)new OscQueryTargetFinder();
         session = new ParamroomSession(finder, c => new UdpOscTransport(c.OscIp, c.OscPort), new WicImageDecoder(), new HttpImageFetcher(),
             history: new JsonFileHistory(JsonFileHistory.DefaultPath()));
         var handler = new CommandHandler(session);
@@ -36,6 +37,7 @@ public partial class App : Application
     {
         // 止めずに閉じると送信のスレッドが残り、プロセスが終わらない
         session?.DisposeAsync().AsTask().Wait(TimeSpan.FromSeconds(3));
+        (finder as IDisposable)?.Dispose();   // stops announcing the OSCQuery service
         base.OnExit(e);
     }
 }

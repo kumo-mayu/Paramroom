@@ -1,26 +1,29 @@
-Paramroom v0.2.1
+Paramroom v0.2.2
 ================
 
 VRChat のアバターに、PC の画像や QR コードを送って周りの人に見せるギミックです。
 アバターの同期パラメータだけを使います。
 
   GitHub : https://github.com/kumo-mayu/Paramroom
-  BOOTH  : https://kumo-mayu.booth.pm/
+  BOOTH  : https://kumo-mayu.booth.pm/items/8868240
   お問い合わせ : BOOTH ショップのメッセージ、または X（@kumo_mayu79）の DM
 
 
 ■ この版について
 
-  v0.2.0 からアバターの作り直しは不要です。
-  v0.2.0 でプレハブを作ったアバターは、そのまま使えます。v0.1.0 から上げる場合は作り直してください。
+  アバターの作り直しは不要です（v0.2.0 以降で作ったアバターはそのまま使えます）。
+  送信アプリ（Paramroom.App.exe）を置き換えるだけで済みます。
+  v0.1.0 から上げる場合は、プレハブを作り直してください。
 
-  - おすすめの構成を「形式 4 ＋ Int 32 個」にしました（ビルダーで最初から選ばれます）
-  - アプリが使っているライブラリのライセンス（THIRD-PARTY-NOTICES.txt）を同梱しました
+  - Paramroom の入っていないアバターを着ていると、送信アプリが 10 秒ごとに VRChat へ
+    接続し直していた不具合を直しました。接続は起動中 1 回だけになります
+  - アバターを着替えると、数秒で送信先が切り替わるようになりました
+  - 説明文の直し（画像は 80 秒ほどで「ほぼ」揃い、全部揃うまでは 90 秒ほど）
 
 
 ■ 入っているもの
 
-  Paramroom-unity-v0.2.1.unitypackage … アバターへの導入ツール（Unity にインポートする）
+  Paramroom-unity-v0.2.2.unitypackage … アバターへの導入ツール（Unity にインポートする）
   Paramroom.App.exe                     … 画像を送る Windows アプリ（インストール不要）
   LICENSE                               … Paramroom のライセンス（MIT）
   THIRD-PARTY-NOTICES.txt               … アプリが使っているライブラリのライセンス
@@ -37,7 +40,7 @@ VRChat のアバターに、PC の画像や QR コードを送って周りの人
 
 ■ アバターに入れる
 
-  1. Paramroom-unity-v0.2.1.unitypackage をプロジェクトにインポートする
+  1. Paramroom-unity-v0.2.2.unitypackage をプロジェクトにインポートする
      （Assets/kumo-mayu/Paramroom に入ります）
   2. ヒエラルキーで導入したいアバターを選ぶ
   3. Tools > Paramroom > Decoder Builder を開き、収まる Int の数を選んで「プレハブを作成」
@@ -77,3 +80,5 @@ VRChat のアバターに、PC の画像や QR コードを送って周りの人
 
   MIT ライセンスです（LICENSE）。改変・再配布できます。著作権表示と LICENSE を残してください。
   送信する画像の権利と、VRChat の規約は守って使ってください。
+
+  QRコードは株式会社デンソーウェーブの登録商標です。

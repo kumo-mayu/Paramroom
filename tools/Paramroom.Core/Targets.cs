@@ -9,13 +9,41 @@ public interface ITargetFinder
     Task<IReadOnlyList<VrcClient>> FindAsync(CancellationToken cancellationToken);
 }
 
-public sealed class OscQueryTargetFinder(double waitSeconds = 3) : ITargetFinder
+// A finder that can tell when the avatar was swapped, so the session re-reads the avatar at once instead of waiting
+// for its next check. Separate from ITargetFinder because only the OSCQuery finder can do it.
+public interface IAvatarChangeSource
 {
+    event Action<string>? AvatarChanged;
+}
+
+// Keeps one VrcConnection (one OSCQuery service, one announcement) for as long as the app runs; see VrcConnection for
+// why. Started on the first search.
+public sealed class OscQueryTargetFinder(double waitSeconds = 3) : ITargetFinder, IAvatarChangeSource, IDisposable
+{
+    readonly object gate = new();
+    VrcConnection? conn;
+
+    public event Action<string>? AvatarChanged;
+
+    VrcConnection Connection()
+    {
+        lock (gate)
+        {
+            if (conn is null) { conn = new VrcConnection(); conn.AvatarChanged += id => AvatarChanged?.Invoke(id); }
+            return conn;
+        }
+    }
+
     public async Task<IReadOnlyList<VrcClient>> FindAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        return await VrcDiscovery.FindAsync(waitSeconds);
+        var profiles = await Connection().VrchatServicesAsync(waitSeconds, cancellationToken);
+        // the cache keeps VRChat clients that have quit (a restart leaves the old entry behind); drop those that no
+        // longer answer so they are not listed as targets
+        return (await VrcDiscovery.InspectAllAsync(profiles)).Where(c => c.Reachable).ToList();
     }
+
+    public void Dispose() { lock (gate) { conn?.Dispose(); conn = null; } }
 }
 
 // A fixed destination instead of OSCQuery: "host:port[:ints[:format]]", e.g. "127.0.0.1:9130:25:3". For checking the app

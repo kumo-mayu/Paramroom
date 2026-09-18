@@ -18,6 +18,10 @@ public sealed class SessionOptions
     // How often to look for VRChat again while no target is selected. Without this, starting VRChat after this app
     // would need the user to press the refresh button. 0 disables it.
     public TimeSpan TargetScanInterval { get; init; } = TimeSpan.FromSeconds(10);
+    // After VRChat reports an avatar swap (/avatar/change), wait this long before reading the avatar's parameters, so
+    // the OSCQuery tree has the new ones. How long VRChat takes to update the tree is not measured; the periodic
+    // check above catches anything this misses.
+    public TimeSpan AvatarChangeSettle { get; init; } = TimeSpan.FromSeconds(1);
     public int PreviewLongSide { get; init; } = 512;
 }
 
@@ -40,6 +44,7 @@ public sealed class ParamroomSession : IAsyncDisposable
     CancellationTokenSource? encodeCts, searchCts, sendCts;
     Task sendTask = Task.CompletedTask;
     int lastEpoch;
+    volatile bool avatarChanged;   // set by an /avatar/change report; the send loop checks the avatar at once
 
     public ParamroomSession(ITargetFinder finder, Func<VrcClient, IOscTransport> transportFactory, IImageDecoder decoder, IImageFetcher fetcher, SessionOptions? options = null, ISourceHistory? history = null)
     {
@@ -47,7 +52,20 @@ public sealed class ParamroomSession : IAsyncDisposable
         this.options = options ?? new SessionOptions();
         this.history = history ?? new InMemoryHistory();
         snapshot = snapshot with { HoldMs = this.options.HoldMs, History = this.history.Load() };
+        if (finder is IAvatarChangeSource source) source.AvatarChanged += OnAvatarChanged;
     }
+
+    // An avatar swap is "read the avatar again", not "find VRChat again": the client is the same one.
+    void OnAvatarChanged(string avatarId) => _ = Task.Run(async () =>
+    {
+        try
+        {
+            await Task.Delay(options.AvatarChangeSettle);
+            if (Snapshot.Send is SendState.Active) { avatarChanged = true; return; }   // the send loop checks at once
+            if (!await RereadKnownAsync()) await RefreshTargetsAsync();
+        }
+        catch (Exception) { /* the periodic scan tries again */ }
+    });
 
     void Remember(SourceKind kind, string value, string name)
     {
@@ -222,8 +240,10 @@ public sealed class ParamroomSession : IAsyncDisposable
         ReencodeIfSpecChanged();
     }
 
-    // Looks for VRChat again, every TargetScanInterval, as long as nothing usable is selected. It stops on its own once
-    // a target is found and resumes if that target disappears, so VRChat can be started before or after this app.
+    // Every TargetScanInterval: re-read the avatar of the VRChat clients already known (a plain HTTP request), and look
+    // for VRChat again only when none of them answers any more (not started yet, quit, or restarted with a different
+    // OSCQuery port). Swapping to or from a Paramroom avatar is therefore picked up without searching again, so VRChat
+    // can be started before or after this app and the avatar changed at any time.
     async Task ScanLoop(CancellationToken ct)
     {
         while (!ct.IsCancellationRequested)
@@ -233,27 +253,43 @@ public sealed class ParamroomSession : IAsyncDisposable
             var s = Snapshot;
             if (s.SearchingTargets) continue;              // a search is already running
             if (s.Send is SendState.Active) continue;      // the send loop watches the target itself
-            if (s.Target is { } t)
-            {
-                // A target we already have can go away: VRChat restarts with a different OSCQuery port, so the old one
-                // answers nothing. Ask it directly (cheap) and only fall back to a full search when it is gone.
-                VrcClient? now = null;
-                bool asked = false;
-                try { now = await VrcDiscovery.RecheckAsync(t); asked = true; }
-                catch (Exception) { }
-                // A target with no OSCQuery address (a fixed one, PARAMROOM_TARGET) cannot be asked; leave it alone.
-                if (t.QueryIp is null || !asked) continue;
-                if (now is not null && IsUsable(now))
-                {
-                    // still there; keep the fresh copy (the avatar or its Int count may have changed)
-                    if (now != t) { Update(x => x with { Target = now, Targets = x.Targets.Select(c => c.Name == now.Name ? now : c).ToList() }); ReencodeIfSpecChanged(); }
-                    continue;
-                }
-                Update(x => x with { Target = null });     // really gone: search again below
-            }
+            // A target with no OSCQuery address (a fixed one, PARAMROOM_TARGET) cannot be asked; leave it alone.
+            if (s.Target is { QueryIp: null }) continue;
+            bool answered = false;
+            try { answered = await RereadKnownAsync(); }
+            catch (Exception) { }
+            if (answered) continue;
+            if (s.Target is not null) Update(x => x with { Target = null });   // really gone: search again below
             try { await RefreshTargetsAsync(); }
             catch (Exception) { /* keep trying */ }
         }
+    }
+
+    // Reads the avatar of every client already known again, over HTTP, and keeps the ones that answer. The selected
+    // target stays if it is still usable; otherwise the only usable client becomes the target. False when none of them
+    // answered, i.e. VRChat has to be searched for again.
+    async Task<bool> RereadKnownAsync()
+    {
+        var s = Snapshot;
+        var known = s.Targets.Where(c => c.QueryIp is not null).ToList();
+        if (known.Count == 0) return false;
+        var fresh = new List<VrcClient>();
+        foreach (var c in known)
+        {
+            try { if (await VrcDiscovery.RecheckAsync(c) is { Reachable: true } now) fresh.Add(now); }
+            catch (Exception) { }
+        }
+        if (fresh.Count == 0) return false;
+        var targets = s.Targets.Where(c => c.QueryIp is null).Concat(fresh).ToList();
+        VrcClient? target = s.Target is { } cur ? targets.FirstOrDefault(c => c.Name == cur.Name && IsUsable(c)) : null;
+        var usable = targets.Where(IsUsable).ToList();
+        target ??= usable.Count == 1 ? usable[0] : null;
+        if (!targets.SequenceEqual(s.Targets) || target != s.Target)
+        {
+            Update(x => x with { Targets = targets, Target = target });
+            ReencodeIfSpecChanged();
+        }
+        return true;
     }
 
     public static bool IsUsable(VrcClient c) => c.ParamroomParams > 0 && c.Problem == null;
@@ -526,9 +562,10 @@ public sealed class ParamroomSession : IAsyncDisposable
                         return;
                     }
                 }
-                else if (check is null && options.AvatarCheckInterval > TimeSpan.Zero && now - lastCheck >= options.AvatarCheckInterval)
+                else if (check is null && (avatarChanged || options.AvatarCheckInterval > TimeSpan.Zero && now - lastCheck >= options.AvatarCheckInterval))
                 {
                     lastCheck = now;
+                    avatarChanged = false;
                     check = Task.Run(() => CheckTargetStillFits(image), ct);
                 }
                 if (now - lastProgress >= options.ProgressInterval)
