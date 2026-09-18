@@ -218,6 +218,18 @@ unitypackage は中身が変わるので新しいものを添付し、「作り�
 - unitypackage が前の版と同じでも**毎回添付する**。「どれとどれを組み合わせるのか」で迷わせない
   （同じであることはノートに書く）
 
+#### 配布物の作り方
+
+`bash tools/release/make-release.sh v0.X.Y <前の版> [出力先]` で、exe・unitypackage・LICENSE・
+THIRD-PARTY-NOTICES.txt・README.txt・BOOTH 用の zip がまとめてできる（出力先の既定は
+`D:/work/ClaudeCode/Paramroom-release`。リポジトリの外）。先に `docs/booth/zip-README.txt` を直す。
+
+- **unitypackage の GUID は前の版から引き継ぐ。** リポジトリに `.meta` が無いので、スクリプトは
+  前の版の unitypackage を土台に中身だけ差し替える。GUID が変わると上書きされず、
+  生成済みのプレハブがシェーダーを見失う。ファイルを足したときは Unity で書き出す
+- exe は `IncludeNativeLibrariesForSelfExtract` と `EnableCompressionInSingleFile` を付けて作る。
+  無いと WPF のネイティブ DLL が外に出て、exe 1 つでは起動できない
+
 #### BOOTH（`kumo-mayu.booth.pm`、カテゴリ「ソフトウェア」）
 
 GitHub の Releases と**同じ中身**を BOOTH にも置く。BOOTH の規約で、外部サイトへ案内するだけの商品は

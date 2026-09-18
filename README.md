@@ -61,7 +61,8 @@ VRChat の [Terms of Service](https://hello.vrchat.com/legal) /
 exe に電子署名はしていません。初回起動時に Windows の SmartScreen が
 「WindowsによってPCが保護されました」と出ることがあります。**詳細情報** →
 **実行** で起動できます。気になる場合は、このリポジトリをそのままビルドしてください
-（`dotnet publish tools/Paramroom.App -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true`）。
+（`dotnet publish tools/Paramroom.App -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true`。
+後ろの 2 つが無いと、WPF のネイティブ DLL が exe の外に出て、exe も 2 倍の大きさになります）。
 
 ## 入れかた
 
