@@ -54,7 +54,7 @@ VRChat の [Terms of Service](https://hello.vrchat.com/legal) /
 
 | ファイル | 何に使うか |
 |---|---|
-| `Paramroom-unity-vX.Y.Z.unitypackage` | アバターに入れる部品。Unity のプロジェクトにインポートする |
+| `Paramroom-unity-*.unitypackage` | アバターに入れる部品。Unity のプロジェクトにインポートする |
 | `Paramroom.App.exe` | 画像を送るアプリ。置いた場所から直接起動できます（インストール不要） |
 
 exe に電子署名はしていません。初回起動時に Windows の SmartScreen が
@@ -64,7 +64,7 @@ exe に電子署名はしていません。初回起動時に Windows の SmartS
 
 ## 入れかた
 
-1. `Paramroom-unity-vX.Y.Z.unitypackage` をプロジェクトにインポートする
+1. Releases の最新版から `Paramroom-unity-*.unitypackage` をプロジェクトにインポートする
    （`Assets/kumo-mayu/Paramroom` に入ります）。リポジトリから使う場合は
    `measure/unity/Assets/kumo-mayu` を `Assets/` にコピーしても同じです。
 2. ヒエラルキーでアバター（またはその子）を選ぶ。
