@@ -14,6 +14,7 @@ public sealed class CommandHandler(ImagePadSession session)
             {
                 case UiCommand.LoadImageFile c: await session.LoadFileAsync(c.Path, cancellationToken); break;
                 case UiCommand.LoadImageUrl c: await session.LoadUrlAsync(c.Url, cancellationToken); break;
+                case UiCommand.LoadQrText c: session.SetQrText(c.Text); break;
                 case UiCommand.LoadImagePixels c: session.SetSource(c.Image, c.Name); break;
                 case UiCommand.LoadImageData c: session.LoadBytes(c.Bytes, c.Name); break;
                 case UiCommand.ClearHistory: session.ClearHistory(); break;

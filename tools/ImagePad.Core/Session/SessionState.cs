@@ -48,9 +48,11 @@ public abstract record EncodeState
     public sealed record Failed(string Message) : EncodeState;
 }
 
+// Qr = the units hold a QR code's modules instead of primitives (docs/research/09). The packets are the same shape;
+// a bit in every packet tells the avatar which one it is, so any prefab can show either.
 public sealed record EncodedImage(
     DecoderSpec Spec, FitMode Fit, int? RequestedPrims, int Aspect, PrimConfig Config, PrimLayout Layout,
-    IReadOnlyList<bool[]> Units, double[] Gains, int Prims, double Seconds, Preview Preview);
+    IReadOnlyList<bool[]> Units, double[] Gains, int Prims, double Seconds, Preview Preview, bool Qr = false);
 
 public sealed record SendProgress(
     int Epoch, string Schedule, string TargetName, long PacketsSent, int DistinctUnits, int TotalUnits,

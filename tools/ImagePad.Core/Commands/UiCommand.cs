@@ -19,6 +19,9 @@ public abstract record UiCommand
     // encoded image bytes (e.g. a data: URI dropped from a browser)
     public sealed record LoadImageData(byte[] Bytes, string Name) : UiCommand;
 
+    // a QR code made from this text, instead of a picture. Empty goes back to the picture.
+    public sealed record LoadQrText(string Text) : UiCommand;
+
     public sealed record ClearHistory() : UiCommand;
 
     public sealed record SetFit(FitMode Fit) : UiCommand;

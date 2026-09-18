@@ -339,6 +339,60 @@ public class PrimCountTests
             Task.FromResult<IReadOnlyList<VrcClient>>(new[] { new VrcClient("c", "127.0.0.1", 9000, null, 32, 3, null) });
     }
 
+    // VRChat may be started after this app, so the search has to repeat on its own until something is found
+    sealed class LateClient : ITargetFinder
+    {
+        public int Calls;
+        public Task<IReadOnlyList<VrcClient>> FindAsync(CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<VrcClient>>(++Calls < 3
+                ? Array.Empty<VrcClient>()
+                : new[] { new VrcClient("c", "127.0.0.1", 9000, null, 32, 3, null) });
+    }
+
+    // VRChat restarting gives it a different OSCQuery port, so a target that was found once can stop answering
+    sealed class RestartingClient : ITargetFinder
+    {
+        public int Calls;
+        public bool Gone;
+        public Task<IReadOnlyList<VrcClient>> FindAsync(CancellationToken cancellationToken)
+        {
+            Calls++;
+            // no QueryIp: RecheckAsync then returns null, which is how a client that cannot be asked again behaves
+            return Task.FromResult<IReadOnlyList<VrcClient>>(Gone
+                ? Array.Empty<VrcClient>()
+                : new[] { new VrcClient("c", "127.0.0.1", 9000, null, 32, 3, null) });
+        }
+    }
+
+    [Fact]
+    public async Task NoticesWhenTheTargetDisappears()
+    {
+        var finder = new RestartingClient();
+        await using var session = new ImagePadSession(finder, _ => throw new InvalidOperationException(), new StbImageDecoder(), new HttpImageFetcher(),
+            options: new SessionOptions { TargetScanInterval = TimeSpan.FromMilliseconds(30) });
+        await session.RefreshTargetsAsync();
+        Assert.NotNull(session.Snapshot.Target);
+        finder.Gone = true;
+        for (int i = 0; i < 100 && session.Snapshot.Target is not null; i++) await Task.Delay(20);
+        Assert.Null(session.Snapshot.Target);           // the loop looked again and found nothing
+        finder.Gone = false;
+        for (int i = 0; i < 100 && session.Snapshot.Target is null; i++) await Task.Delay(20);
+        Assert.NotNull(session.Snapshot.Target);        // and picks it up again when VRChat comes back
+    }
+
+    [Fact]
+    public async Task KeepsLookingUntilVrchatAppears()
+    {
+        var finder = new LateClient();
+        await using var session = new ImagePadSession(finder, _ => throw new InvalidOperationException(), new StbImageDecoder(), new HttpImageFetcher(),
+            options: new SessionOptions { TargetScanInterval = TimeSpan.FromMilliseconds(30) });
+        await session.RefreshTargetsAsync();
+        Assert.Null(session.Snapshot.Target);           // not there yet
+        for (int i = 0; i < 100 && session.Snapshot.Target is null; i++) await Task.Delay(20);
+        Assert.NotNull(session.Snapshot.Target);        // found without anyone pressing refresh
+        Assert.True(finder.Calls >= 3);
+    }
+
     [Fact]
     public async Task FewerPrimitivesMeanFewerUnitsWithTheSameLayout()
     {

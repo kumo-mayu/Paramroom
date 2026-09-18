@@ -38,6 +38,7 @@ public sealed class MainViewModel : ViewModelBase
         session.SnapshotChanged += OnSnapshot;
         ChooseFileCommand = new RelayCommand(ChooseFile, () => !IsBusy);
         LoadUrlCommand = new RelayCommand(() => Run(new UiCommand.LoadImageUrl(UrlText)), () => !IsBusy && !string.IsNullOrWhiteSpace(UrlText));
+        MakeQrCommand = new RelayCommand(() => Run(new UiCommand.LoadQrText(QrText)), () => !IsBusy && !string.IsNullOrWhiteSpace(QrText));
         RefreshTargetsCommand = new RelayCommand(() => Run(new UiCommand.RefreshTargets()), () => !IsSearching);
         StartStopCommand = new RelayCommand(() => Run(IsSending ? new UiCommand.StopSending() : new UiCommand.StartSending()), () => IsSending || CanStart);
         PasteCommand = new RelayCommand(Paste, () => !IsBusy);
@@ -46,6 +47,7 @@ public sealed class MainViewModel : ViewModelBase
 
     public RelayCommand ChooseFileCommand { get; }
     public RelayCommand LoadUrlCommand { get; }
+    public RelayCommand MakeQrCommand { get; }
     public RelayCommand RefreshTargetsCommand { get; }
     public RelayCommand StartStopCommand { get; }
     public RelayCommand PasteCommand { get; }
@@ -145,8 +147,17 @@ public sealed class MainViewModel : ViewModelBase
     string urlText = "";
     public string UrlText { get => urlText; set => SetField(ref urlText, value); }
 
+    // text to turn into a QR code. A QR code goes out in a handful of packets, so it is on the avatar in well under a
+    // second, where a picture takes about 100 seconds (docs/research/09).
+    string qrText = "";
+    public string QrText { get => qrText; set => SetField(ref qrText, value); }
+
     bool isBusy;
     public bool IsBusy { get => isBusy; private set => SetField(ref isBusy, value); }
+
+    // a QR code has no primitives to count and no aspect to fit, so those choices are only for a picture
+    bool isPicture = true;
+    public bool IsPicture { get => isPicture; private set => SetField(ref isPicture, value); }
 
     ImageSource? sourceImage;
     public ImageSource? SourceImage { get => sourceImage; private set => SetField(ref sourceImage, value); }
@@ -347,7 +358,9 @@ public sealed class MainViewModel : ViewModelBase
                         if (!ReferenceEquals((old?.Encode as EncodeState.Ready)?.Image, img) || EncodedImage is null) EncodedImage = ToBitmap(img.Preview);
                         EncodeProgress = 1;
                         double lap = img.Units.Count * s.HoldMs / 1000;
-                        EncodeText = $"変換しました：図形 {img.Prims} 個、{img.Units.Count} パケット（1 周 約 {FormatDuration(TimeSpan.FromSeconds(lap))}）。" +
+                        IsPicture = !img.Qr;
+                        string what = img.Qr ? $"QR コード（{(int)Math.Sqrt(img.Prims)} × {(int)Math.Sqrt(img.Prims)} 升）" : $"図形 {img.Prims} 個";
+                        EncodeText = $"変換しました：{what}、{img.Units.Count} パケット（1 周 約 {FormatDuration(TimeSpan.FromSeconds(lap))}）。" +
                                      $"{img.Spec.Format.Name}・Int {img.Spec.Ints} 個のアバター向け{(img.Spec.Assumed ? "（アバターの種類が分からないため既定の設定）" : "")}";
                         break;
                     case EncodeState.Failed f:
@@ -443,7 +456,10 @@ public sealed class MainViewModel : ViewModelBase
             : $"送信先：VRChat（ポート {c.OscPort}）。アバターは {spec.Format.Name}・Int {spec.Ints} 個に対応しています。";
     }
 
-    static string FormatDuration(TimeSpan t) => t.TotalMinutes >= 1 ? $"{(int)t.TotalMinutes} 分 {t.Seconds} 秒" : $"{t.Seconds} 秒";
+    static string FormatDuration(TimeSpan t) =>
+        t.TotalMinutes >= 1 ? $"{(int)t.TotalMinutes} 分 {t.Seconds} 秒"
+        : t.TotalSeconds >= 1 ? $"{t.Seconds} 秒"
+        : $"{t.TotalSeconds:0.0} 秒";   // a QR code is well under a second, and "0 秒" reads like nothing happened
 
     static BitmapSource ToBitmap(Preview p)
     {

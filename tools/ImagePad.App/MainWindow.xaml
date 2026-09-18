@@ -84,6 +84,20 @@
                             <Button Grid.Column="1" Content="URL から読み込む" Command="{Binding LoadUrlCommand}" Margin="6,0,0,0" />
                         </Grid>
                         <TextBlock Style="{StaticResource Note}" Text="ファイルやブラウザの画像のドラッグ、画像・URL の貼り付け（Ctrl+V）でも指定できます。" />
+                        <Grid Margin="0,12,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBox Grid.Column="0" Text="{Binding QrText, UpdateSourceTrigger=PropertyChanged}" VerticalContentAlignment="Center"
+                                     AutomationProperties.Name="QR コードにする文字列" MinHeight="30">
+                                <TextBox.InputBindings>
+                                    <KeyBinding Key="Enter" Command="{Binding MakeQrCommand}" />
+                                </TextBox.InputBindings>
+                            </TextBox>
+                            <Button Grid.Column="1" Content="QR コードにする" Command="{Binding MakeQrCommand}" Margin="6,0,0,0" />
+                        </Grid>
+                        <TextBlock Style="{StaticResource Note}" Text="QR コードは 1 秒かからずに相手に出ます（画像は 100 秒ほどかかります）。" />
                         <Grid Margin="0,8,0,0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
@@ -104,8 +118,8 @@
                         </StackPanel>
                         <TextBlock Style="{StaticResource Note}" Text="図形を減らすと 1 周が短くなりますが、細かいところが粗くなります。" />
                         <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                            <RadioButton Content="画像全体を送る" IsChecked="{Binding FitStretch}" GroupName="fit" Margin="0,0,16,0" />
-                            <RadioButton Content="中央を正方形に切り抜く" IsChecked="{Binding FitCrop}" GroupName="fit" />
+                            <RadioButton Content="画像全体を送る" IsChecked="{Binding FitStretch}" GroupName="fit" Margin="0,0,16,0" IsEnabled="{Binding IsPicture}" />
+                            <RadioButton Content="中央を正方形に切り抜く" IsChecked="{Binding FitCrop}" GroupName="fit" IsEnabled="{Binding IsPicture}" />
                         </StackPanel>
                     </StackPanel>
                     <Border Style="{StaticResource PreviewFrame}" Margin="0,10,0,0">

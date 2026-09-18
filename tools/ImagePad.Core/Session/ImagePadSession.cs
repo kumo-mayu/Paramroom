@@ -15,6 +15,9 @@ public sealed class SessionOptions
     // While sending, ask the client every so often whether it still has the same avatar. Packets meant for one decoder
     // produce a broken picture on another, so sending has to stop when the avatar is swapped. 0 disables the check.
     public TimeSpan AvatarCheckInterval { get; init; } = TimeSpan.FromSeconds(5);
+    // How often to look for VRChat again while no target is selected. Without this, starting VRChat after this app
+    // would need the user to press the refresh button. 0 disables it.
+    public TimeSpan TargetScanInterval { get; init; } = TimeSpan.FromSeconds(10);
     public int PreviewLongSide { get; init; } = 512;
 }
 
@@ -31,6 +34,9 @@ public sealed class ImagePadSession : IAsyncDisposable
     readonly object gate = new();
     SessionSnapshot snapshot = SessionSnapshot.Initial;
     Img? sourceImage;
+    string? qrText;   // when set, the source is a QR code made from this text instead of a picture
+    Task? scanTask;
+    CancellationTokenSource? scanCts;
     CancellationTokenSource? encodeCts, searchCts, sendCts;
     Task sendTask = Task.CompletedTask;
     int lastEpoch;
@@ -117,9 +123,40 @@ public sealed class ImagePadSession : IAsyncDisposable
         catch (Exception e) { throw new ImageSourceException("画像として読めませんでした。PNG・JPEG などの画像ファイル（URL なら画像そのものの URL）を指定してください。", e); }
     }
 
+    // A QR code made from text. It goes through the same packets as a picture, but it is a handful of them instead of
+    // a thousand, so it is complete in well under a second (docs/research/09).
+    public void SetQrText(string text)
+    {
+        text = text?.Trim() ?? "";
+        lock (gate) { qrText = text.Length > 0 ? text : null; if (qrText != null) sourceImage = null; }
+        if (qrText is null) { Update(s => s with { Source = null }); return; }
+        QrMode.QrData qr;
+        try { qr = QrMode.Build(qrText); }
+        catch (Exception e)
+        {
+            Update(s => s with { Encode = new EncodeState.Failed("QR コードを作れませんでした：" + e.Message) });
+            return;
+        }
+        var spec = DecoderSpec.For(Snapshot.Target);
+        var preview = QrPreview(qr, spec.Canvas);
+        Update(s => s with { Source = new SourceInfo(Shorten(qrText), qr.Modules, qr.Modules, preview) });
+        StartEncode();
+    }
+
+    static string Shorten(string t) => t.Length <= 40 ? t : t[..38] + "…";
+
+    Preview QrPreview(QrMode.QrData qr, int R)
+    {
+        // the finished code: every unit present
+        var L = PrimLayout.Of(DecoderFormat.Default.Config(DecoderFormat.Default.N), 254);
+        var units = QrMode.Encode(qr, L, 254);
+        var all = units.Select(u => (bool[]?)u).ToList();
+        return ToPreview(Img.FromRgbBytes(QrRenderer.Render(R, L, all), R, R), Aspect.Code(1, 1));
+    }
+
     public void SetSource(Img image, string name)
     {
-        lock (gate) sourceImage = image;
+        lock (gate) { sourceImage = image; qrText = null; }
         var preview = ToPreview(image, Aspect.Code(image.W, image.H));
         Update(s => s with { Source = new SourceInfo(name, image.W, image.H, preview) });
         StartEncode();
@@ -145,8 +182,17 @@ public sealed class ImagePadSession : IAsyncDisposable
 
     // ---- targets
 
+    // started on the first search; runs until the session is disposed
+    void EnsureScanLoop()
+    {
+        if (scanTask is not null || options.TargetScanInterval <= TimeSpan.Zero) return;
+        scanCts = new CancellationTokenSource();
+        scanTask = Task.Run(() => ScanLoop(scanCts.Token));
+    }
+
     public async Task RefreshTargetsAsync()
     {
+        EnsureScanLoop();
         searchCts?.Cancel();
         var cts = searchCts = new CancellationTokenSource();
         Update(s => s with { SearchingTargets = true });
@@ -160,6 +206,40 @@ public sealed class ImagePadSession : IAsyncDisposable
         target ??= usable.Count == 1 ? usable[0] : null;
         Update(s => s with { SearchingTargets = false, Targets = found, Target = target });
         ReencodeIfSpecChanged();
+    }
+
+    // Looks for VRChat again, every TargetScanInterval, as long as nothing usable is selected. It stops on its own once
+    // a target is found and resumes if that target disappears, so VRChat can be started before or after this app.
+    async Task ScanLoop(CancellationToken ct)
+    {
+        while (!ct.IsCancellationRequested)
+        {
+            try { await Task.Delay(options.TargetScanInterval, ct); }
+            catch (OperationCanceledException) { return; }
+            var s = Snapshot;
+            if (s.SearchingTargets) continue;              // a search is already running
+            if (s.Send is SendState.Active) continue;      // the send loop watches the target itself
+            if (s.Target is { } t)
+            {
+                // A target we already have can go away: VRChat restarts with a different OSCQuery port, so the old one
+                // answers nothing. Ask it directly (cheap) and only fall back to a full search when it is gone.
+                VrcClient? now = null;
+                bool asked = false;
+                try { now = await VrcDiscovery.RecheckAsync(t); asked = true; }
+                catch (Exception) { }
+                // A target with no OSCQuery address (a fixed one, IMAGEPAD_TARGET) cannot be asked; leave it alone.
+                if (t.QueryIp is null || !asked) continue;
+                if (now is not null && IsUsable(now))
+                {
+                    // still there; keep the fresh copy (the avatar or its Int count may have changed)
+                    if (now != t) { Update(x => x with { Target = now, Targets = x.Targets.Select(c => c.Name == now.Name ? now : c).ToList() }); ReencodeIfSpecChanged(); }
+                    continue;
+                }
+                Update(x => x with { Target = null });     // really gone: search again below
+            }
+            try { await RefreshTargetsAsync(); }
+            catch (Exception) { /* keep trying */ }
+        }
     }
 
     public static bool IsUsable(VrcClient c) => c.ImagePadParams > 0 && c.Problem == null;
@@ -196,8 +276,9 @@ public sealed class ImagePadSession : IAsyncDisposable
     void StartEncode()
     {
         Img? src;
-        lock (gate) src = sourceImage;
-        if (src is null) return;
+        string? qr;
+        lock (gate) { src = sourceImage; qr = qrText; }
+        if (src is null && qr is null) return;
         encodeCts?.Cancel();
         var cts = encodeCts = new CancellationTokenSource();
         var s0 = Snapshot;
@@ -216,12 +297,31 @@ public sealed class ImagePadSession : IAsyncDisposable
             Update(s => s with { Encode = new EncodeState.Failed($"Int {spec.Ints} 個では縦横比を送る余白がありません。この形式で使える数（{good}）で作り直してください。") });
             return;
         }
+        // A QR code needs no search: the modules go straight into the packets, so it is ready at once.
+        if (qr is not null)
+        {
+            try
+            {
+                var data = QrMode.Build(qr);
+                var units = QrMode.Encode(data, layout, P);
+                var all = units.Select(u => (bool[]?)u).ToList();
+                var prev = ToPreview(Img.FromRgbBytes(QrRenderer.Render(cfg.R, layout, all), cfg.R, cfg.R), Aspect.Code(1, 1));
+                var image = new EncodedImage(spec, fit, requested, Aspect.Code(1, 1), cfg, layout, units,
+                    Enumerable.Repeat(1.0, units.Count).ToArray(), data.Modules * data.Modules, 0, prev, Qr: true);
+                Update(s => s with { Encode = new EncodeState.Ready(image) });
+            }
+            catch (Exception e)
+            {
+                Update(s => s with { Encode = new EncodeState.Failed("QR コードを作れませんでした：" + e.Message) });
+            }
+            return;
+        }
         Update(s => s with { Encode = new EncodeState.Running(0, cfg.MaxPrims) });
         EncodeTask = Task.Run(() =>
         {
             try
             {
-                var img = src;
+                var img = src!;
                 int aspect = fit == FitMode.Crop ? Aspect.Code(1, 1) : Aspect.Code(img.W, img.H);
                 if (fit == FitMode.Crop) { int m = Math.Min(img.W, img.H); img = img.Crop((img.W - m) >> 1, (img.H - m) >> 1, m, m); }
                 img = img.Resize(cfg.R, cfg.R);
@@ -281,7 +381,7 @@ public sealed class ImagePadSession : IAsyncDisposable
         int epoch = lastEpoch = lastEpoch % 3 + 1;  // 1..3; a new epoch makes receivers clear the old image
         // the avatar tells which parameter names it has (prefixed, or the plain D0.. of avatars built earlier)
         string prefix = Snapshot.Target?.ParamPrefix ?? "";
-        var bundles = Packets.Build(image.Units, epoch, image.Aspect, image.Spec.Ints).Select(p => OscSender.Bundle(p, prefix)).ToArray();
+        var bundles = Packets.Build(image.Units, epoch, image.Aspect, image.Spec.Ints, image.Qr).Select(p => OscSender.Bundle(p, prefix)).ToArray();
         IOscTransport transport;
         try { transport = transportFactory(target); }
         catch (Exception e) { throw new ImageSourceException($"送信先に接続できませんでした: {e.Message}", e); }
@@ -291,6 +391,11 @@ public sealed class ImagePadSession : IAsyncDisposable
         Update(s => s with { Send = new SendState.Active(start) });
         sendTask = Task.Run(() => SendLoop(image, bundles, schedule, transport, start, cts.Token));
     }
+
+    // what the receivers have so far, drawn the way their decoder would (a picture or a QR code)
+    static byte[] RenderReceived(EncodedImage image, IReadOnlyList<bool[]?> received) =>
+        image.Qr ? QrRenderer.Render(image.Config.R, image.Layout, received)
+                 : PrimRenderer.Render(image.Config, image.Layout, received);
 
     // null while the target still matches what was encoded; otherwise the message to show
     async Task<string?> CheckTargetStillFits(EncodedImage image)
@@ -341,7 +446,7 @@ public sealed class ImagePadSession : IAsyncDisposable
                 var now = sw.Elapsed;
                 if (distinct != renderedDistinct && now - lastRender >= options.ReceivedPreviewInterval)
                 {
-                    receivedPreview = ToPreview(Img.FromRgbBytes(PrimRenderer.Render(image.Config, image.Layout, received), image.Config.R, image.Config.R), image.Aspect);
+                    receivedPreview = ToPreview(Img.FromRgbBytes(RenderReceived(image, received), image.Config.R, image.Config.R), image.Aspect);
                     renderedDistinct = distinct; lastRender = now;
                     progress = progress with { Received = receivedPreview };
                 }
@@ -369,7 +474,7 @@ public sealed class ImagePadSession : IAsyncDisposable
                 }
             }
             if (renderedDistinct != distinct)
-                progress = progress with { Received = ToPreview(Img.FromRgbBytes(PrimRenderer.Render(image.Config, image.Layout, received), image.Config.R, image.Config.R), image.Aspect) };
+                progress = progress with { Received = ToPreview(Img.FromRgbBytes(RenderReceived(image, received), image.Config.R, image.Config.R), image.Aspect) };
             var final = progress with { PacketsSent = sent, DistinctUnits = distinct, Elapsed = sw.Elapsed };
             Update(s => s.Send is SendState.Active ? s with { Send = new SendState.Stopped(final) } : s);
         }
@@ -392,7 +497,9 @@ public sealed class ImagePadSession : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
-        encodeCts?.Cancel(); searchCts?.Cancel();
+        encodeCts?.Cancel(); searchCts?.Cancel(); scanCts?.Cancel();
         await StopSendingAsync(keepProgress: true);
+        if (scanTask is not null) { try { await scanTask.WaitAsync(TimeSpan.FromSeconds(2)); } catch (Exception) { } }
+        encodeCts?.Dispose(); searchCts?.Dispose(); scanCts?.Dispose();
     }
 }

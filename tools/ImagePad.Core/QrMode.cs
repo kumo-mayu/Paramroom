@@ -73,3 +73,48 @@ public static class QrMode
         return units;
     }
 }
+
+// Renders received units the way the avatar decoder does (sim/codecs/qrmode.js decoder.render, QrPixel in the shader):
+// white everywhere, black where a module's bit is 1, and white wherever the packet holding that module has not arrived.
+// Used for the "what receivers see" preview while sending.
+public static class QrRenderer
+{
+    // units[id] = the unit's bits ([unit id][payload]) or null when not received. Returns RGB 0..255 bytes, R x R.
+    public static byte[] Render(int R, PrimLayout L, IReadOnlyList<bool[]?> units)
+    {
+        var px = new byte[R * R * 3];
+        Array.Fill(px, (byte)255);
+        if (units.Count == 0 || units[0] is not bool[] u0) return px;
+
+        int n = 0;
+        for (int i = 0; i < 8; i++) n = (n << 1) | (u0[L.U + i] ? 1 : 0);
+        if (n < 21 || n > QrMode.MaxModules) return px;
+
+        int cells = n + 2 * QrMode.Quiet;
+        int cell = R / cells;
+        if (cell < 1) return px;
+        int pad = (R - cell * cells) / 2;
+
+        for (int my = 0; my < n; my++)
+        {
+            for (int mx = 0; mx < n; mx++)
+            {
+                int idx = my * n + mx;
+                int slot = idx / L.PrimBits, off = idx % L.PrimBits;
+                int unit = slot < L.K0 ? 0 : 1 + (slot - L.K0) / L.K;
+                int inUnit = slot < L.K0 ? slot : (slot - L.K0) % L.K;
+                if (unit >= units.Count || units[unit] is not bool[] u) continue;   // not arrived: stays white
+                int at = L.U + (unit == 0 ? 16 : 0) + inUnit * L.PrimBits + off;
+                if (at >= u.Length || !u[at]) continue;                              // white module
+                int x0 = pad + (QrMode.Quiet + mx) * cell, y0 = pad + (QrMode.Quiet + my) * cell;
+                for (int y = y0; y < y0 + cell; y++)
+                    for (int x = x0; x < x0 + cell; x++)
+                    {
+                        int o = (y * R + x) * 3;
+                        px[o] = px[o + 1] = px[o + 2] = 0;
+                    }
+            }
+        }
+        return px;
+    }
+}
