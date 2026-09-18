@@ -54,8 +54,23 @@ recv.bind(outPort, '127.0.0.1', () => {
     clearInterval(timer);
     setTimeout(() => {
       recv.close(); send.close();
-      const distinct = new Set(seen.map(s => s.v)).size;
-      console.log(`送った値 ${sentCount} 個 / 出てきた値 ${seen.length} 個（種類 ${distinct}）`);
+      // 値は 0..255 で一周するので「種類」では数えられない。出てきた順に並べ、連続する重複を潰してから
+      // 「1 つずつ増えているか」を見る。増え方が 2 以上なら、その間の値は拾われなかったということ。
+      const seq = [];
+      for (const x of seen) if (seq.length === 0 || seq[seq.length - 1] !== x.v) seq.push(x.v);
+      // 送る値は 1 ずつ増やしているので、出てきた順に 1 ずつ増えていれば全部拾えている。
+      // 2 以上増えていればその間が飛ばされた。逆戻りは UDP の順序入れ替わりで、間隔を詰めすぎると起きる。
+      let skipped = 0, steps = 0, reordered = 0;
+      for (let i = 1; i < seq.length; i++) {
+        const d = (seq[i] - seq[i - 1] + 256) % 256;
+        steps++;
+        if (d === 1) continue;
+        if (d > 128) reordered++;        // 逆戻り（順序の入れ替わり）
+        else skipped += d - 1;
+      }
+      console.log(`送った値 ${sentCount} 個 / 出てきたメッセージ ${seen.length} 個 / 値の変化 ${seq.length} 回`);
+      console.log(`  飛ばされた値: ${skipped} 個 / 順序の入れ替わり ${reordered} 回（変化 ${steps} 回のうち）`);
+      if (reordered > steps / 20) console.log('  ※入れ替わりが多いので、この間隔では数えられません（間隔を伸ばしてください）');
       if (seen.length === 0) {
         console.log('  何も出てきませんでした。OSC の出力が無効か、そのパラメータがアバターに無いか、');
         console.log('  VRChat が OSC で書いた値を外に出さない作りのどちらかです。');
@@ -66,7 +81,7 @@ recv.bind(outPort, '127.0.0.1', () => {
       gaps.sort((a, b) => a - b);
       const q = p => gaps[Math.min(gaps.length - 1, Math.floor(gaps.length * p))];
       console.log(`  出てきた間隔 ミリ秒: 中央 ${q(0.5)} / 90% ${q(0.9)} / 最大 ${gaps[gaps.length - 1]}`);
-      console.log(`  拾えた割合: ${(seen.length / sentCount * 100).toFixed(0)} %`);
+      console.log(`  拾えた割合: ${((seq.length) / sentCount * 100).toFixed(0)} %（値の変化 ÷ 送った数）`);
     }, 500);
   }, seconds * 1000);
 });
