@@ -97,7 +97,7 @@
                             </TextBox>
                             <Button Grid.Column="1" Content="QR コードにする" Command="{Binding MakeQrCommand}" Margin="6,0,0,0" />
                         </Grid>
-                        <TextBlock Style="{StaticResource Note}" Text="QR コードは 1 秒かからずに相手に出ます（画像は 100 秒ほどかかります）。" />
+                        <TextBlock Style="{StaticResource Note}" Text="{Binding QrNote}" TextWrapping="Wrap" />
                         <Grid Margin="0,8,0,0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />

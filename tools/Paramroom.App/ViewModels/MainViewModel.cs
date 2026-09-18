@@ -159,6 +159,11 @@ public sealed class MainViewModel : ViewModelBase
     bool isPicture = true;
     public bool IsPicture { get => isPicture; private set => SetField(ref isPicture, value); }
 
+    // 「QR は一瞬で出ます」とは書けない。Int の数と QR の大きさで 0.3 秒から 20 秒以上まで変わるので、
+    // 今の送信先での実際の時間を出す（送信先が決まるまでは、その旨だけ言う）。
+    string qrNote = "QR コードが出るまでの時間は、相手のアバターの Int の数と文字列の長さで変わります。";
+    public string QrNote { get => qrNote; private set => SetField(ref qrNote, value); }
+
     ImageSource? sourceImage;
     public ImageSource? SourceImage { get => sourceImage; private set => SetField(ref sourceImage, value); }
 
@@ -379,6 +384,7 @@ public sealed class MainViewModel : ViewModelBase
                     foreach (var c in s.Targets) Targets.Add(new TargetOption(c.Name, Describe(c), ParamroomSession.IsUsable(c)));
                 }
                 SelectedTarget = s.Target is { } t ? Targets.FirstOrDefault(o => o.Name == t.Name) : null;
+                QrNote = QrNoteFor(s.Target, s.HoldMs);
                 TargetText = s.SearchingTargets ? "送信先の VRChat を探しています…"
                     : s.Target is { } tt ? TargetDetail(tt)
                     : s.Targets.Count == 0 ? "VRChat が見つかりません。VRChat を起動して OSC を有効にし、Paramroom 入りのアバターを着てから「探し直す」を押してください。"
@@ -454,6 +460,28 @@ public sealed class MainViewModel : ViewModelBase
         return spec.Assumed
             ? $"送信先：VRChat（ポート {c.OscPort}）。アバターの種類が読めないため、512px・図形 4000 個・Int {spec.Ints} 個として送ります。"
             : $"送信先：VRChat（ポート {c.OscPort}）。アバターは {spec.DisplayName}・Int {spec.Ints} 個に対応しています。";
+    }
+
+    // QR の欄の下に出す説明。「一瞬で出ます」は Int の数と QR の大きさで変わるので書けない
+    // （3 Int なら短い URL でも 3.2 秒、57x57 なら 21.9 秒）。今の送信先での実際の時間を出す。
+    static string QrNoteFor(VrcClient? target, double holdMs)
+    {
+        if (target is null || !ParamroomSession.IsUsable(target))
+            return "QR コードが出るまでの時間は、相手のアバターの Int の数と文字列の長さで変わります。";
+        var spec = DecoderSpec.For(target);
+        // QR は数秒の世界なので、秒を切り捨てると 3.2 秒が「3 秒」になって実際より速く見える
+        static string Short(double ms) => ms < 10000 ? $"{ms / 1000:0.0} 秒" : FormatDuration(TimeSpan.FromMilliseconds(ms));
+        string Time(int modules) => spec.QrPackets(modules) is int n ? Short(n * holdMs) : "—";
+        string tail = spec.IsQrOnly
+            ? "（このアバターは QR 専用なので、画像は送れません）"
+            : $"（画像は {FormatDuration(TimeSpan.FromMilliseconds(PictureLap(spec, holdMs)))}）";
+        return $"このアバター（Int {spec.Ints} 個）だと、短い URL で {Time(25)}、長めの URL で {Time(37)}かかります{tail}。";
+    }
+
+    static double PictureLap(DecoderSpec spec, double holdMs)
+    {
+        try { return PrimLayout.Of(spec.Format.Config(spec.Format.N), 8 * spec.Ints - 2).Units * holdMs; }
+        catch (InvalidOperationException) { return 0; }
     }
 
     static string FormatDuration(TimeSpan t) =>

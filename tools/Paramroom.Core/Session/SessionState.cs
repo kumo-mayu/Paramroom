@@ -45,6 +45,21 @@ public sealed record DecoderSpec(DecoderFormatInfo Format, int Ints, int? Format
     }
 
     public bool SameLayout(DecoderSpec other) => Format.SameFields(other.Format) && Ints == other.Ints;
+
+    // n x n の QR がこの送信先で何パケットになるか。入らない組み合わせなら null。
+    // 「QR は一瞬で出ます」は Int の数と QR の大きさで大きく変わる（3 Int なら短い URL でも 3.2 秒）ので、
+    // 画面には決め打ちの文言ではなくこの値から作った文を出す。
+    public int? QrPackets(int modules)
+    {
+        if (IsQrOnly)
+            return QrOnly.LayoutFor(Ints) is { } q ? QrOnly.UnitsNeeded(q, modules) : null;
+        try
+        {
+            var layout = PrimLayout.Of(Format.Config(Format.N), 8 * Ints - 2);
+            return layout.SpareBits < 8 ? null : QrMode.UnitsNeeded(layout, modules);
+        }
+        catch (InvalidOperationException) { return null; }
+    }
 }
 
 public abstract record EncodeState
