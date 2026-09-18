@@ -54,7 +54,7 @@ https://github.com/kumo-mayu/Paramroom
 --- Paramroom.App.exe（画像を送る Windows アプリ。インストール不要）
 --- README.txt
 --- LICENSE（MIT）
---- THIRD-PARTY.md（使っているライブラリ）
+--- THIRD-PARTY-NOTICES.txt（アプリが使っているライブラリのライセンス）
 ```
 
 ## 購入前の注意
@@ -230,8 +230,12 @@ MIT ライセンスです（同梱の LICENSE）。
 ## クレジット
 
 ```
-送信アプリで次のライブラリを使っています（詳しくは同梱の THIRD-PARTY.md）。
-（ライセンス表記の整理が終わったら、ここを THIRD-PARTY.md と同じ一覧に直す）
+送信アプリで次のライブラリを使っています（ライセンスの全文は同梱の THIRD-PARTY-NOTICES.txt）。
+- Net.Codecrete.QrCodeGenerator（MIT）
+- VRChat.OSCQuery（MIT, VRChat Inc.）
+- MeaMod.DNS / Newtonsoft.Json / Microsoft.Extensions.Logging.Abstractions（MIT）
+- StbImageSharp（Unlicense）
+- .NET ランタイム（MIT）
 
 サムネイル、動画に使用したアセット
 ※購入ファイルには含まれていません
@@ -276,7 +280,6 @@ MIT ライセンスです（同梱の LICENSE）。
 
 ## 貼る前に確かめること
 
-- [ ] ライセンス表記の整理（クレジットの節と同梱の THIRD-PARTY の中身）
 - [ ] サムネイル・動画に使うアバターのクレジット
 - [ ] v0.2.0 の更新履歴の中身（リリースノートの要約）
 

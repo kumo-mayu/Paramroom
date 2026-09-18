@@ -175,7 +175,8 @@ QR コードのときは、白黒の升目そのものをパケットに載せ�
 
 ## ライセンス
 
-MIT（[`LICENSE`](LICENSE)）。使っているライブラリと素材の出典は [`THIRD-PARTY.md`](THIRD-PARTY.md) にあります。
+MIT（[`LICENSE`](LICENSE)）。使っているライブラリと素材の出典は [`THIRD-PARTY.md`](THIRD-PARTY.md)、
+送信アプリに入っているライブラリのライセンス全文は [`THIRD-PARTY-NOTICES.txt`](THIRD-PARTY-NOTICES.txt) にあります。
 
 テスト画像には CC BY-SA のものが含まれます。`measure/results/` の比較画像を再配布する場合は、
 `sim/images/SOURCES.txt` の帰属表示を一緒に持っていってください。

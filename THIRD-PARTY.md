@@ -6,9 +6,19 @@
 
 | もの | 用途 | ライセンス |
 |---|---|---|
-| [StbImageSharp](https://github.com/StbSharp/StbImageSharp) | 画像（PNG/JPEG など）の読み込み | Unlicense OR MIT |
+| [StbImageSharp](https://github.com/StbSharp/StbImageSharp) | 画像（PNG/JPEG など）の読み込み | Unlicense OR MIT（Unlicense で使う） |
 | [VRChat.OSCQuery](https://github.com/vrchat-community/vrc-oscquery-lib) | VRChat を見つけ、アバターのパラメータを読む | MIT（VRChat Inc.） |
 | [Net.Codecrete.QrCodeGenerator](https://github.com/manuelbl/QrCodeGenerator) | QR コードの生成 | MIT |
+| [MeaMod.DNS](https://github.com/meamod/MeaMod.DNS) | VRChat.OSCQuery が使う（mDNS） | MIT |
+| [Newtonsoft.Json](https://www.newtonsoft.com/json) | VRChat.OSCQuery が使う | MIT |
+| Microsoft.Extensions.Logging.Abstractions | VRChat.OSCQuery が使う | MIT |
+| .NET ランタイム 9・Windows Desktop ランタイム 9（WPF） | exe に同梱（self-contained） | MIT（ランタイムの第三者表示つき） |
+
+**exe を配るときは [`THIRD-PARTY-NOTICES.txt`](THIRD-PARTY-NOTICES.txt) を必ず一緒に付ける。**
+MIT は「著作権表示と許諾表示を、ソフトウェアのすべての複製に含める」ことを条件にしているので、
+上のライブラリの表示の本文をまとめてある。依存を足したら（間接的な依存も含めて。
+`dotnet list tools/Paramroom.App package --include-transitive`）ここと NOTICES の両方を直す。
+v0.2.0 までのリリースには付いていなかった（v0.2.1 から付ける）。
 
 PNG の書き出しは `tools/Paramroom.Core/PngWriter.cs` の自前実装です（以前使っていた
 StbImageWriteSharp はライセンス表記が無く、再配布できないため外しました）。

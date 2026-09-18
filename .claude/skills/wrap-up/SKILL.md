@@ -31,7 +31,7 @@ dotnet test  tools/Paramroom.sln -c Release --nologo -v q 2>&1 | tail -2
 | 測って決めたこと | `docs/research/NN-*.md`（タグ `[実測]` `[推測]` `[公式]` を付ける） |
 | 利用者から見える機能・制約 | `README.md`、`measure/unity/Assets/kumo-mayu/Paramroom/README.md` |
 | 形式・Int 数・時間の表 | 上の 2 つと `docs/research/09`（QR）。**3 箇所がずれやすい** |
-| 依存を足した | `THIRD-PARTY.md`（ライセンスを確かめてから） |
+| 依存を足した | `THIRD-PARTY.md` と `THIRD-PARTY-NOTICES.txt`（ライセンスを確かめてから。間接的な依存も） |
 
 **数字を書き換えたら、他の場所の同じ数字も探す**（`grep` で秒数や MB を追う）。
 

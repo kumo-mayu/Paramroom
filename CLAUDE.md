@@ -225,7 +225,9 @@ GitHub の Releases と**同じ中身**を BOOTH にも置く。BOOTH の規約�
 
 - バリエーションは「無料版」（¥0）と「支援版(中身は同じ)」（¥500）。**両方に同じ zip** を付ける
 - zip の名前は `Paramroom-v0.X.Y.zip`。中身は `Paramroom-unity-v0.X.Y.unitypackage`・`Paramroom.App.exe`・
-  `LICENSE`・`THIRD-PARTY.md`・`README.txt`（導入手順と「作り直しが要るか」）
+  `LICENSE`・`THIRD-PARTY-NOTICES.txt`・`README.txt`（導入手順と「作り直しが要るか」）
+- **GitHub の Releases にも `THIRD-PARTY-NOTICES.txt` を毎回添付する**（exe に MIT のライブラリと
+  .NET ランタイムが入っているので、表示を付けて配る義務がある。`THIRD-PARTY.md`）
 - 版を出すたびに、**両方のバリエーションの zip を差し替え**、商品名の版番号と「更新履歴」を直す。
   更新履歴にも「アバターの作り直しが要るか」を書く
 - 差し替え・公開は**ユーザーが自分で行う**（外向きの操作）。こちらは zip と文面の用意まで
