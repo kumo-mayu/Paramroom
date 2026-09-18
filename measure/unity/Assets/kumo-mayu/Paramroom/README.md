@@ -101,3 +101,7 @@ QR コードは、白黒の升目そのものをパケットに載せていま�
 1. アバターのプロジェクトの `Assets/ParamroomMeasure` から、`Editor/ParamroomBuilder.cs`、`Shaders/ParamroomDecoder.shader`、`Shaders/ParamroomDisplay.shader` を消す。残すと同じクラスやシェーダーが 2 つになり、コンパイルエラーやシェーダーの取り違えが起きる。
 2. この `Paramroom` フォルダを `Assets/kumo-mayu/Paramroom` として入れる。
 3. ビルダーでプレハブを作り直し、アバターの古い `ParamroomDecoder*` と入れ替える。古いプレハブと `GeneratedPrim*` フォルダは、消したシェーダーを指しているので消してよい。
+
+---
+
+QRコードは株式会社デンソーウェーブの登録商標です。
