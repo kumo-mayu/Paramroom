@@ -62,6 +62,11 @@ public static class DecoderFormat
 
     // what is assumed when the avatar does not tell (prefabs before Paramroom_Format)
     public static DecoderFormatInfo Default => Known[3];
+
+    // QR 専用デコーダー（docs/research/09 §6）。図形が無いので Known には入れない。
+    // 画像モードの割り付けを使わないので Int 3 個から動く。
+    public const int QrOnlyId = 10;
+    public const string QrOnlyName = "QR 専用";
 }
 
 // The avatar parameters this tool drives. The prefix keeps them from colliding with other gimmicks (plain "D0" is a

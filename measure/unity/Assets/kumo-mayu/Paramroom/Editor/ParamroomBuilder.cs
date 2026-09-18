@@ -230,6 +230,156 @@ public static class ParamroomBuilder
         return prefabPath;
     }
 
+    // ---- QR 専用（docs/research/09 §6）
+    //
+    // 画像モードは「図形 1 個ぶんの枠」に区切るので、図形が 1 パケットに入らない Int 数では割り付けが
+    // 成立しない（形式 3 で 10 Int、形式 4 で 9 Int が下限）。QR しか出さないなら枠が要らないので、
+    // 3 Int から作れる。キャンバスも図形の置き場も不要で、マス目 1 つ 1 テクセルだけ持つ。
+    public const int QrFormatId = 10;
+    public const int QrMaxVersion = 10;                     // 57x57。表示板の解像度でもカメラでもこのあたりが上限
+    public const int QrMaxSide = 17 + 4 * QrMaxVersion;
+    public const int QrHead = 6;                            // 版 6 bit（先頭パケットだけ）
+    public const int QrAtlasW = 64;                         // >= QrMaxSide、制御行はその下
+    const float QrFar = 0.0297f;                            // 画像用の形式と重ならない値
+    public const int QrMinBytes = 3, QrMaxBytes = 16;       // シェーダが読むのは _P0.._P15
+
+    public struct QrLayout { public int bytes, u, pay, first, maxUnits; }
+    public static QrLayout? QrLayoutFor(int bytes)
+    {
+        int P = 8 * bytes - 2, maxCells = QrMaxSide * QrMaxSide - 3 * 8 * 8;
+        for (int u = 1; u <= 12; u++)
+        {
+            int pay = P - u;
+            if (pay <= QrHead) continue;
+            int first = pay - QrHead;
+            int maxUnits = 1 + (int)Math.Ceiling((maxCells - first) / (double)pay);
+            if (maxUnits <= (1 << u)) return new QrLayout { bytes = bytes, u = u, pay = pay, first = first, maxUnits = maxUnits };
+        }
+        return null;
+    }
+    // 版 v の QR が何パケットになるか（100 ms/パケット）
+    public static int QrUnits(QrLayout L, int version)
+    {
+        int n = 17 + 4 * version, cells = n * n - 3 * 8 * 8;
+        return cells <= L.first ? 1 : 1 + (int)Math.Ceiling((cells - L.first) / (double)L.pay);
+    }
+    public static string QrPrefabName(int bytes) => $"ParamroomQrDecoder_{bytes}int";
+
+    public static string BuildQr(int bytes)
+    {
+        var L = QrLayoutFor(bytes) ?? throw new Exception($"QR 専用: {bytes} Int では割り付けが成立しません（{QrMinBytes} 以上）");
+        if (bytes > QrMaxBytes) throw new Exception($"QR 専用は {QrMaxBytes} Int までです");
+        string prefabName = QrPrefabName(bytes);
+        string Gen = Root + "/GeneratedQr_" + bytes + "int";
+        if (!AssetDatabase.IsValidFolder(Gen)) AssetDatabase.CreateFolder(Root, "GeneratedQr_" + bytes + "int");
+        T Save<T>(T obj, string name) where T : UnityEngine.Object
+        {
+            var path = $"{Gen}/{name}";
+            if (AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(path) != null) AssetDatabase.DeleteAsset(path);
+            AssetDatabase.CreateAsset(obj, path);
+            return obj;
+        }
+        var decShader = Shader.Find("Paramroom/QrDecoder");
+        var dispShader = Shader.Find("Paramroom/QrDisplay");
+        if (decShader == null || dispShader == null) throw new Exception("Paramroom QR shaders not found");
+
+        float farA = QrFar, farB = farA + 0.0002f;
+        RenderTexture Atlas(string name)
+        {
+            var d = new RenderTextureDescriptor(QrAtlasW, QrMaxSide + 1, RenderTextureFormat.ARGBHalf, 0) { sRGB = false, msaaSamples = 1, useMipMap = false, autoGenerateMips = false };
+            return Save(new RenderTexture(d) { name = name, filterMode = FilterMode.Point, wrapMode = TextureWrapMode.Clamp }, name + ".renderTexture");
+        }
+        var rtA = Atlas("ParamroomQrAtlasA_" + bytes);
+        var rtB = Atlas("ParamroomQrAtlasB_" + bytes);
+        var matA = Save(new Material(decShader) { name = "ParamroomQrDecA" }, "ParamroomQrDecA.mat");
+        matA.SetTexture("_Src", rtB); matA.SetFloat("_Far", farA);
+        var matB = Save(new Material(decShader) { name = "ParamroomQrDecB" }, "ParamroomQrDecB.mat");
+        matB.SetTexture("_Src", rtA); matB.SetFloat("_Far", farB);
+        var dispMat = Save(new Material(dispShader) { name = "ParamroomQrDisplay" }, "ParamroomQrDisplay.mat");
+        dispMat.SetTexture("_Atlas", rtA); dispMat.SetFloat("_MaxSide", QrMaxSide); dispMat.SetFloat("_Quiet", 4);
+        foreach (var m in new[] { matA, matB })
+        {
+            m.SetFloat("_ByteCount", bytes); m.SetFloat("_U", L.u); m.SetFloat("_Pay", L.pay); m.SetFloat("_MaxSide", QrMaxSide);
+            EditorUtility.SetDirty(m);
+        }
+
+        var root = new GameObject(prefabName);
+        var quadMesh = Resources.GetBuiltinResource<Mesh>("Quad.fbx");
+        var disp = new GameObject("Display");
+        disp.transform.SetParent(root.transform, false);
+        disp.transform.localPosition = new Vector3(0.5f, 1.3f, 0.45f);
+        disp.transform.localRotation = Quaternion.Euler(0, 180, 0);
+        disp.transform.localScale = Vector3.one * 0.45f;
+        disp.AddComponent<MeshFilter>().sharedMesh = quadMesh;
+        var dr = disp.AddComponent<MeshRenderer>();
+        dr.sharedMaterial = dispMat;
+        dr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; dr.receiveShadows = false;
+
+        var loop = new GameObject("Loop");
+        loop.transform.SetParent(root.transform, false);
+        loop.transform.localPosition = new Vector3(0, -4, 0);
+        void MakeCam(string name, Vector3 pos, RenderTexture target, Material mat, float far)
+        {
+            var go = new GameObject(name) { layer = LoopLayer };
+            go.transform.SetParent(loop.transform, false);
+            go.transform.localPosition = pos;
+            var cam = go.AddComponent<Camera>();
+            cam.orthographic = true; cam.orthographicSize = 0.01f; cam.nearClipPlane = 0.001f; cam.farClipPlane = far;
+            cam.clearFlags = CameraClearFlags.Nothing; cam.cullingMask = 1 << LoopLayer; cam.targetTexture = target;
+            cam.allowHDR = false; cam.allowMSAA = false; cam.depth = name == "CamA" ? -101 : -100; cam.enabled = false;
+            var q = new GameObject("Quad") { layer = LoopLayer };
+            q.transform.SetParent(go.transform, false);
+            q.transform.localPosition = new Vector3(0, 0, 0.012f);
+            q.transform.localScale = Vector3.one * 0.1f;
+            q.AddComponent<MeshFilter>().sharedMesh = quadMesh;
+            var r = q.AddComponent<MeshRenderer>();
+            r.sharedMaterial = mat; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; r.receiveShadows = false;
+        }
+        MakeCam("CamA", Vector3.zero, rtA, matA, farA);
+        MakeCam("CamB", new Vector3(0, 0, 1), rtB, matB, farB);
+
+        string[] quads = { "Loop/CamA/Quad", "Loop/CamB/Quad" };
+        var children = new List<ChildMotion>();
+        AnimationCurve Const(float v) => new AnimationCurve(new Keyframe(0, v), new Keyframe(1f / 60f, v));
+        for (int i = 0; i < bytes; i++)
+        {
+            var clip = new AnimationClip { name = $"ParamroomQr_Set_P{i}" };
+            foreach (var q in quads) AnimationUtility.SetEditorCurve(clip, EditorCurveBinding.FloatCurve(q, typeof(MeshRenderer), $"material._P{i}"), Const(1));
+            children.Add(new ChildMotion { motion = Save(clip, clip.name + ".anim"), directBlendParameter = ParamroomNames.Data(i), timeScale = 1 });
+        }
+        var baseClip = new AnimationClip { name = "ParamroomQr_Base" };
+        foreach (var q in quads) for (int i = 0; i < bytes; i++) AnimationUtility.SetEditorCurve(baseClip, EditorCurveBinding.FloatCurve(q, typeof(MeshRenderer), $"material._P{i}"), Const(0));
+        foreach (var c in new[] { "Loop/CamA", "Loop/CamB" }) AnimationUtility.SetEditorCurve(baseClip, EditorCurveBinding.FloatCurve(c, typeof(Camera), "m_Enabled"), Const(1));
+        children.Add(new ChildMotion { motion = Save(baseClip, baseClip.name + ".anim"), directBlendParameter = "Paramroom_One", timeScale = 1 });
+
+        var ctrlPath = $"{Gen}/ParamroomQr_FX.controller";
+        if (AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(ctrlPath) != null) AssetDatabase.DeleteAsset(ctrlPath);
+        var ctrl = AnimatorController.CreateAnimatorControllerAtPath(ctrlPath);
+        for (int i = 0; i < bytes; i++) ctrl.AddParameter(ParamroomNames.Data(i), AnimatorControllerParameterType.Float);
+        ctrl.AddParameter(new AnimatorControllerParameter { name = "Paramroom_One", type = AnimatorControllerParameterType.Float, defaultFloat = 1 });
+        var tree = new BlendTree { name = "ParamroomQrDirect", blendType = BlendTreeType.Direct, useAutomaticThresholds = false, hideFlags = HideFlags.HideInHierarchy };
+        tree.children = children.ToArray();
+        AssetDatabase.AddObjectToAsset(tree, ctrl);
+        var so = new SerializedObject(tree);
+        var norm = so.FindProperty("m_NormalizedBlendValues");
+        if (norm != null) { norm.boolValue = false; so.ApplyModifiedPropertiesWithoutUndo(); }
+        var sm = ctrl.layers[0].stateMachine;
+        var st = sm.AddState("ParamroomQrRun");
+        st.motion = tree; st.writeDefaultValues = true; sm.defaultState = st;
+        var layers = ctrl.layers; layers[0].name = "ParamroomQr"; layers[0].defaultWeight = 1; ctrl.layers = layers;
+        EditorUtility.SetDirty(ctrl);
+
+        ParamroomModularAvatar.AddMergeAnimator(root, ctrl);
+        ParamroomModularAvatar.AddParameters(root, bytes, QrFormatId);
+        string prefabPath = $"{Root}/{prefabName}.prefab";
+        PrefabUtility.SaveAsPrefabAsset(root, prefabPath);
+        UnityEngine.Object.DestroyImmediate(root);
+        AssetDatabase.SaveAssets();
+        AssetDatabase.Refresh();
+        Debug.Log($"[Paramroom] built {prefabPath} (QR 専用, {bytes} Int, u={L.u} pay={L.pay} first={L.first} 最大 {L.maxUnits} パケット)");
+        return prefabPath;
+    }
+
     // ---- synced bits of an avatar via NDMF (reflection, so this file compiles without NDMF)
     // returns (bits used by everything except Paramroom decoders, bits used by Paramroom decoders), or null without NDMF
     public static (int others, int paramroom)? SyncedBits(GameObject avatarRoot)
@@ -269,6 +419,8 @@ public sealed class ParamroomBuilderWindow : EditorWindow
 {
     int formatId = 3;
     int selected = -1;
+    int kind;            // 0 = 画像と QR の両方、1 = QR 専用
+    int qrBytes = 4;
     Vector2 scroll;
 
     [MenuItem("Tools/Paramroom/Decoder Builder")]
@@ -276,9 +428,25 @@ public sealed class ParamroomBuilderWindow : EditorWindow
 
     void OnSelectionChange() => Repaint();
 
+    // アバターの空きビット（NDMF が無ければ null）
+    int? FreeBits(out GameObject avatar)
+    {
+        avatar = null;
+        var sel = Selection.activeGameObject;
+        for (var tr = sel != null ? sel.transform : null; tr != null; tr = tr.parent)
+            if (tr.GetComponents<Component>().Any(c => c != null && c.GetType().Name == "VRCAvatarDescriptor")) { avatar = tr.gameObject; break; }
+        if (avatar == null) return null;
+        var bits = ParamroomBuilder.SyncedBits(avatar);
+        return bits is { } b ? 256 - b.others : (int?)null;
+    }
+
     void OnGUI()
     {
         scroll = EditorGUILayout.BeginScrollView(scroll);
+        int newKind = GUILayout.Toolbar(kind, new[] { "画像と QR", "QR 専用" });
+        if (newKind != kind) { kind = newKind; selected = -1; }
+        EditorGUILayout.Space();
+        if (kind == 1) { QrGui(); EditorGUILayout.EndScrollView(); return; }
         EditorGUILayout.LabelField("フォーマット（キャンバス / 図形数）", EditorStyles.boldLabel);
         var keys = ParamroomBuilder.Formats.Keys.ToArray();
         int fi = Math.Max(0, Array.IndexOf(keys, formatId));
@@ -339,5 +507,49 @@ public sealed class ParamroomBuilderWindow : EditorWindow
             EditorGUILayout.HelpBox("アバターには Paramroom デコーダーを 1 つだけ入れてください。センダーは Paramroom_Format と D0..D" + (l.bytes - 1) + " の数を OSCQuery で読み、自動で合わせます。", MessageType.None);
         }
         EditorGUILayout.EndScrollView();
+    }
+
+    // QR 専用（docs/research/09 §6）。画像は出せないが、Int 3 個から作れる。
+    void QrGui()
+    {
+        EditorGUILayout.HelpBox(
+            "QR コードだけを出すデコーダーです。画像は出せません。\n" +
+            "同期パラメータがほとんど空いていないアバター向けで、Int 3 個から作れます。" +
+            $"版 {ParamroomBuilder.QrMaxVersion}（{ParamroomBuilder.QrMaxSide}x{ParamroomBuilder.QrMaxSide}）までの QR を出せます。",
+            MessageType.Info);
+
+        int? free = FreeBits(out var avatar);
+        EditorGUILayout.Space();
+        if (avatar == null) EditorGUILayout.HelpBox("ヒエラルキーでアバター（またはその子）を選択すると、空きビット数を表示します。", MessageType.Info);
+        else if (free is not int f) EditorGUILayout.HelpBox("NDMF が見つからないため、使用ビット数を取得できません。", MessageType.Warning);
+        else
+        {
+            EditorGUILayout.LabelField("アバター", avatar.name);
+            EditorGUILayout.LabelField("Paramroom が使える空き", $"{f} bit（Int {f / 8} 個）");
+        }
+
+        EditorGUILayout.Space();
+        EditorGUILayout.LabelField("Int の数（多いほど速い）", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField("秒数は「全部そろうまで」（100 ms/パケット）", EditorStyles.miniLabel);
+        for (int b = ParamroomBuilder.QrMinBytes; b <= ParamroomBuilder.QrMaxBytes; b++)
+        {
+            var L = ParamroomBuilder.QrLayoutFor(b);
+            if (L is not ParamroomBuilder.QrLayout l) continue;
+            bool fits = free is not int f2 || b * 8 <= f2;
+            string label = $"Int {b} 個（{b * 8} bit）: 短い URL（25x25）{ParamroomBuilder.QrUnits(l, 2) / 10.0:F1} 秒" +
+                           $"、長め（37x37）{ParamroomBuilder.QrUnits(l, 5) / 10.0:F1} 秒" +
+                           $"、最大（{ParamroomBuilder.QrMaxSide}x{ParamroomBuilder.QrMaxSide}）{ParamroomBuilder.QrUnits(l, ParamroomBuilder.QrMaxVersion) / 10.0:F1} 秒" +
+                           (fits ? "" : "  ※空きが足りません");
+            using (new EditorGUI.DisabledScope(!fits))
+                if (EditorGUILayout.ToggleLeft(label, qrBytes == b) && qrBytes != b) qrBytes = b;
+        }
+
+        EditorGUILayout.Space();
+        if (GUILayout.Button($"プレハブを作成: {ParamroomBuilder.QrPrefabName(qrBytes)}", GUILayout.Height(28)))
+        {
+            string path = ParamroomBuilder.BuildQr(qrBytes);
+            EditorGUIUtility.PingObject(AssetDatabase.LoadAssetAtPath<GameObject>(path));
+        }
+        EditorGUILayout.HelpBox($"アバターには Paramroom デコーダーを 1 つだけ入れてください。センダーは Paramroom_Format（{ParamroomBuilder.QrFormatId} = QR 専用）と D0..D{qrBytes - 1} の数を OSCQuery で読み、自動で合わせます。", MessageType.None);
     }
 }

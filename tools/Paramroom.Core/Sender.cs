@@ -37,6 +37,21 @@ public static class Packets
             return bytes;
         }).ToArray();
     }
+
+    // QR 専用モード（docs/research/09 §6）。縦横比コードもモードのビットも要らないので、epoch の後は全部中身。
+    public static byte[][] BuildQrOnly(IReadOnlyList<bool[]> units, int epoch, int nBytes)
+    {
+        int total = 8 * nBytes;
+        return units.Select(u =>
+        {
+            var bits = new bool[total];
+            bits[0] = ((epoch >> 1) & 1) == 1; bits[1] = (epoch & 1) == 1;
+            Array.Copy(u, 0, bits, 2, Math.Min(u.Length, total - 2));
+            var bytes = new byte[nBytes];
+            for (int i = 0; i < nBytes; i++) { int v = 0; for (int k = 0; k < 8; k++) v = (v << 1) | (bits[i * 8 + k] ? 1 : 0); bytes[i] = (byte)v; }
+            return bytes;
+        }).ToArray();
+    }
 }
 
 // transport.js sqrtSchedule: unit i sent with frequency p_i ∝ sqrt(gain_i), realised by stride scheduling

@@ -285,6 +285,43 @@ public sealed class ParamroomSession : IAsyncDisposable
         var spec = DecoderSpec.For(s0.Target);
         var fit = s0.Fit;
         var requested = s0.PrimCount;
+
+        // QR 専用のデコーダー（docs/research/09 §6）。図形の枠を使わないので、割り付けも詰め方も別。
+        if (spec.IsQrOnly)
+        {
+            if (qr is null)
+            {
+                Update(s => s with { Encode = new EncodeState.Failed("このアバターのデコーダーは QR 専用です。画像は送れません。QR にしたい文字列を入れてください。") });
+                return;
+            }
+            var qL = QrOnly.LayoutFor(spec.Ints);
+            if (qL is null)
+            {
+                Update(s => s with { Encode = new EncodeState.Failed($"Int {spec.Ints} 個では QR が入りません（{QrOnly.MinBytes} 個以上で作り直してください）。") });
+                return;
+            }
+            try
+            {
+                var data = QrOnly.Build(qr);
+                var units = QrOnly.Encode(data, qL);
+                var r = new QrOnlyRenderer(qL);
+                foreach (var u in units) r.Apply(u);
+                var (side, px) = r.Render();
+                var rgb = new byte[side * side * 3];
+                for (int i = 0; i < side * side; i++) rgb[i * 3] = rgb[i * 3 + 1] = rgb[i * 3 + 2] = px[i];
+                var prev = ToPreview(Img.FromRgbBytes(rgb, side, side), Aspect.Code(1, 1));
+                var cfgQr = spec.Format.Config(1);
+                var image = new EncodedImage(spec, fit, requested, Aspect.Code(1, 1), cfgQr, PrimLayout.Of(cfgQr, 254), units,
+                    Enumerable.Repeat(1.0, units.Count).ToArray(), data.Modules * data.Modules, 0, prev, Qr: true);
+                Update(s => s with { Encode = new EncodeState.Ready(image) });
+            }
+            catch (Exception e)
+            {
+                Update(s => s with { Encode = new EncodeState.Failed("QR コードを作れませんでした：" + e.Message) });
+            }
+            return;
+        }
+
         int P = 8 * spec.Ints - WireBitsReserved;
         var cfg = spec.Format.Config(Math.Min(Math.Min(spec.Capacity, requested ?? int.MaxValue), options.EncodePrimsLimit ?? int.MaxValue));
         PrimLayout layout;
@@ -381,7 +418,11 @@ public sealed class ParamroomSession : IAsyncDisposable
         int epoch = lastEpoch = lastEpoch % 3 + 1;  // 1..3; a new epoch makes receivers clear the old image
         // the avatar tells which parameter names it has (prefixed, or the plain D0.. of avatars built earlier)
         string prefix = Snapshot.Target?.ParamPrefix ?? "";
-        var bundles = Packets.Build(image.Units, epoch, image.Aspect, image.Spec.Ints, image.Qr).Select(p => OscSender.Bundle(p, prefix)).ToArray();
+        // QR 専用は縦横比コードもモードのビットも持たない（docs/research/09 §6）
+        var packets = image.Spec.IsQrOnly
+            ? Packets.BuildQrOnly(image.Units, epoch, image.Spec.Ints)
+            : Packets.Build(image.Units, epoch, image.Aspect, image.Spec.Ints, image.Qr);
+        var bundles = packets.Select(p => OscSender.Bundle(p, prefix)).ToArray();
         IOscTransport transport;
         try { transport = transportFactory(target); }
         catch (Exception e) { throw new ImageSourceException($"送信先に接続できませんでした: {e.Message}", e); }
@@ -410,7 +451,7 @@ public sealed class ParamroomSession : IAsyncDisposable
             return "アバターが変わり、Paramroom が入っていないアバターになりました。送信を止めました。";
         var spec = DecoderSpec.For(now);
         if (!spec.SameLayout(image.Spec))
-            return $"アバターが {spec.Format.Name}・Int {spec.Ints} 個に変わりました。送信を止めたので、画像を作り直して送り直してください。";
+            return $"アバターが {spec.DisplayName}・Int {spec.Ints} 個に変わりました。送信を止めたので、画像を作り直して送り直してください。";
         if (now.AvatarId is { } id && target.AvatarId is { } was && id != was)
             return "アバターが変わりました（同じ形式ですが別のアバターです）。送信を止めました。";
         return null;

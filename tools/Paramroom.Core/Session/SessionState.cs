@@ -26,9 +26,17 @@ public sealed record DecoderSpec(DecoderFormatInfo Format, int Ints, int? Format
     public int Canvas => Format.R;
     public int Capacity => Format.N;
 
+    // QR 専用のデコーダー（docs/research/09 §6）。画像は出せないが Int 3 個から動く。
+    // 図形が無いので Format の中身は使わない（下の IsQrOnly を見てから分岐すること）。
+    public bool IsQrOnly => FormatId == DecoderFormat.QrOnlyId;
+    // 画面に出す名前。QR 専用のときは Format の中身に意味が無いので、そちらを見せない
+    public string DisplayName => IsQrOnly ? DecoderFormat.QrOnlyName : Format.Name;
+
     public static DecoderSpec For(VrcClient? target)
     {
         if (target is null || target.ParamroomParams <= 0) return Default;
+        if (target.Format == DecoderFormat.QrOnlyId)
+            return new DecoderSpec(DecoderFormat.Default, target.ParamroomParams, DecoderFormat.QrOnlyId, false);
         if (target.Format is int f && DecoderFormat.Known.TryGetValue(f, out var known))
             return new DecoderSpec(known, target.ParamroomParams, f, false);
         if (target.Format is int unknown)
