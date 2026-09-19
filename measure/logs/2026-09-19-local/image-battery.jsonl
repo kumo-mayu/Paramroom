@@ -1,0 +1,8 @@
+{"img":"kodim23.png","q":50,"size":"768x512","chunks":347,"bpp":0.766,"encMs":152,"sendMs":478,"present":"347/347","completeMs":417,"decodeMs":68,"rej":2,"longestUs":16194,"err":0}
+{"img":"kodim23.png","q":75,"size":"768x512","chunks":528,"bpp":1.166,"encMs":153,"sendMs":723,"present":"528/528","completeMs":584,"decodeMs":66,"rej":3,"longestUs":12210,"err":0}
+{"img":"kodim23.png","q":92,"size":"768x512","chunks":1118,"bpp":2.468,"encMs":162,"sendMs":1545,"present":"1118/1118","completeMs":1305,"decodeMs":66,"rej":29,"longestUs":19655,"err":0}
+{"img":"kodim05.png","q":85,"size":"768x512","chunks":1637,"bpp":3.614,"encMs":164,"sendMs":2267,"present":"1637/1637","completeMs":2246,"decodeMs":62,"rej":8,"longestUs":18359,"err":0}
+{"img":"screenshot_mahara.png","q":75,"size":"960x847","chunks":1282,"bpp":1.369,"encMs":260,"sendMs":1778,"present":"1282/1282","completeMs":1558,"decodeMs":100,"rej":22,"longestUs":18594,"err":0}
+{"img":"screenshot_mahara.png","q":90,"size":"960x847","chunks":2191,"bpp":2.339,"encMs":276,"sendMs":3034,"present":"2191/2191","completeMs":2237,"decodeMs":99,"rej":16,"longestUs":18466,"err":0}
+{"img":"illust_wikipetan_face.png","q":85,"size":"960x960","chunks":1254,"bpp":1.181,"encMs":295,"sendMs":1734,"present":"1254/1254","completeMs":1503,"decodeMs":123,"rej":11,"longestUs":17718,"err":0}
+{"img":"illust_pc_newyear.png","q":85,"size":"960x571","chunks":1389,"bpp":2.199,"encMs":234,"sendMs":1923,"present":"1389/1389","completeMs":1606,"decodeMs":79,"rej":32,"longestUs":17818,"err":0}

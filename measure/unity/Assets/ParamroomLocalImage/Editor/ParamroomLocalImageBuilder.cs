@@ -9,7 +9,7 @@
 //
 // A prefab contains:
 //   - store atlases A/B 256 x 516 ARGB32 (4096 chunks + status row + control row), block map 256 x 192 ARGBFloat,
-//     band 1024 x 128 ARGBFloat, image 1024 x 1024 ARGB32 (about 12 MB of render textures)
+//     band 1024 x 128 ARGBFloat, image 1024 x 1024 ARGB32 (about 8 MB of render textures)
 //   - Loop/CamStoreA (copy + K/32 group quads), CamStoreB (copy + statistics), CamMap, CamIdctV, CamIdctH
 //   - Hud (statistics + preview, normal view only) and Jack (the photo camera sees the image), wearer only
 //   - FX: Direct blend tree PRL0..PRL{K-1} -> material._F{i%32} of group i/32, PRS -> CamStoreB quad _Session,

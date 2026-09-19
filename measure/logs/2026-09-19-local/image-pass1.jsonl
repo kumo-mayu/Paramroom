@@ -1,0 +1,10 @@
+{"rate":45,"sendMs":3023,"present":2191,"total":2191,"missing":0,"rej":42,"err":0}
+{"rate":45,"sendMs":3023,"present":2191,"total":2191,"missing":0,"rej":44,"err":0}
+{"rate":60,"sendMs":2267,"present":2188,"total":2191,"missing":3,"rej":44,"err":0}
+{"rate":60,"sendMs":2267,"present":2191,"total":2191,"missing":0,"rej":54,"err":0}
+{"rate":75,"sendMs":1814,"present":2182,"total":2191,"missing":9,"rej":31,"err":0}
+{"rate":75,"sendMs":1814,"present":2186,"total":2191,"missing":5,"rej":31,"err":0}
+{"rate":90,"sendMs":1511,"present":2139,"total":2191,"missing":52,"rej":16,"err":0}
+{"rate":90,"sendMs":1512,"present":2141,"total":2191,"missing":50,"rej":37,"err":0}
+{"rate":105,"sendMs":1296,"present":1730,"total":2191,"missing":461,"rej":79,"err":0}
+{"rate":105,"sendMs":1296,"present":1729,"total":2191,"missing":462,"rej":86,"err":0}
