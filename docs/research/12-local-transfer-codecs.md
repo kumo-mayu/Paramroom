@@ -2,6 +2,9 @@
 
 作成日: 2026-09-19 / シミュレーション: `sim/local/`（Node.js、C# は `Paramroom.Core` の PrimEncoder）
 
+
+符号化時間はどの機械で測ったかの記録が無い（[docs/measure/environment.md](../measure/environment.md)）。ビット数と画質は機械によらない。
+
 ## 凡例（証拠タグ）
 
 - **[実測]** このリポジトリのシミュレーションで得た値（再現方法は §8）

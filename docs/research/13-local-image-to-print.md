@@ -1,6 +1,7 @@
 # 調査報告 13: 自分のアバターに画像を送って写真に写す（ローカル転送 → カメラジャック → Print）
 
 調査日: 2026-09-19。VRChat の実機（メイン機、デスクトップモード、fps 上限なし）と Unity 2022.3.22f1 batchmode。
+機械のスペックとソフトの版は [docs/measure/environment.md](../measure/environment.md)。fps・負荷・時間はその機械での値。
 関連: [12（符号化方式の比較）](12-local-transfer-codecs.md)。
 
 ## 凡例（証拠タグ）
