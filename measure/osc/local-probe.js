@@ -12,7 +12,7 @@
 //   F0 = header [tag 2][0 12][chunk 16], F1..F31 = [tag 2][test pattern 28]   (float bits = 2^23 + value)
 // tag = send counter mod 4 (the avatar drops groups whose parameters come from different sends).
 // Chunks go round robin: pass 1 sends 0..chunks-1 once, pass 2 again, ... The avatar counts what it received;
-// read it with local-probe-read.js. Every send is logged to measure/logs/<time>-local-run.csv.
+// read it with local-probe-read.js. Every send is logged to measure/logs/<date>-local/<time>-local-run.csv.
 const dgram = require('dgram');
 const fs = require('fs');
 const path = require('path');
@@ -132,7 +132,7 @@ async function run() {
   await sleep(100);
   for (let g = 0; g < groups; g++) await send(bundle(Array.from({ length: 32 }, (_, j) => floatBitsMsg(addrs[g * 32 + j], 0))));
   await sleep(tail);
-  const dir = path.join(__dirname, '..', 'logs');
+  const dir = path.join(__dirname, '..', 'logs', new Date().toISOString().slice(0, 10) + '-local');
   fs.mkdirSync(dir, { recursive: true });
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
   const file = path.join(dir, `${stamp}-local-run.csv`);

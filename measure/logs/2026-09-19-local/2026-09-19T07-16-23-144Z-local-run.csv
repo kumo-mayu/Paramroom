@@ -1,0 +1,6 @@
+# session 963680 k 512 groups 16 chunks 64 rate 20 passes 1 maxbytes 1400
+send,tStartMs,tEndMs,datagrams,bytes,firstChunk
+0,0.005,1.998,16,20696,0
+1,50.000,50.743,16,20696,16
+2,100.000,100.818,16,20696,32
+3,150.000,150.830,16,20696,48
