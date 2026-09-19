@@ -1,14 +1,20 @@
 'use strict';
 // Read the local transport probe's overlay (ParamroomLocalHud.shader) from a screenshot of VRChat (docs/research/12).
-//   node local-probe-read.js [shot.png]      # without a file: captures the VRChat window (capture-window.ps1)
+//   node local-probe-read.js [shot.png] [--image]   # without a file: captures the VRChat window (capture-window.ps1)
 // Prints the 16 control words and what follows from them (completion time, fps, torn frames).
 const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
 const { PNG } = require(path.join(__dirname, '..', 'analysis', 'node_modules', 'pngjs'));
 
-const NAMES = ['frames', 'present', 'correct', 'taken', 'rejected', 'nowMs', 'firstMs', 'completeMs', 'framesAtComplete',
-  'session', 'target', 'framesWithTaken', 'longestFrameUs', 'resetMs', 'cleanFrames', 'tornFrames'];
+// word order of the control row: the probe (ParamroomLocalLoop.shader) or, with --image, the local image prefab
+// (ParamroomLocalImageLoop.shader)
+const IMAGE = process.argv.includes('--image');
+const NAMES = IMAGE
+  ? ['frames', 'present', 'total', 'taken', 'rejected', 'nowMs', 'firstMs', 'completeMs', 'completeFrame', 'session', 'size',
+    'decodedMs', 'longestFrameUs', 'resetMs', 'cleanFrames', 'tornFrames']
+  : ['frames', 'present', 'correct', 'taken', 'rejected', 'nowMs', 'firstMs', 'completeMs', 'framesAtComplete',
+    'session', 'target', 'framesWithTaken', 'longestFrameUs', 'resetMs', 'cleanFrames', 'tornFrames'];
 
 function capture() {
   const out = path.join(require('os').tmpdir(), `paramroom-probe-${Date.now()}.png`);
@@ -38,15 +44,16 @@ function read(file) {
   const since = s.nowMs - s.resetMs;
   const derived = {
     frameErrors: frameErr,
-    size: `${W}x${H}`,
+    shot: `${W}x${H}`,
     fpsSinceReset: since > 0 ? +(s.frames / since * 1000).toFixed(2) : null,
     completeAfterFirstMs: s.completeMs ? s.completeMs - s.firstMs : null,
     completeAfterResetMs: s.completeMs ? s.completeMs - s.resetMs : null,
     rejectedShare: s.taken + s.rejected ? +(s.rejected / (s.taken + s.rejected)).toFixed(4) : null,
     tornFrameShare: s.framesWithTaken ? +(s.tornFrames / s.framesWithTaken).toFixed(4) : null,
+    ...(IMAGE ? { width: s.size >>> 16, height: s.size & 0xFFFF, decodeAfterCompleteMs: s.decodedMs && s.completeMs ? s.decodedMs - s.completeMs : null } : {}),
   };
   return { ...s, ...derived };
 }
 
-const file = process.argv[2] || capture();
+const file = process.argv.slice(2).find(a => !a.startsWith('--')) || capture();
 console.log(JSON.stringify(read(file), null, 1));
