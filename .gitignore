@@ -18,3 +18,5 @@ measure/analysis/synthetic/
 # .NET build output
 tools/**/bin/
 tools/**/obj/
+# primitive runs of the local-transfer codec study (regenerable with sim/local/prim-cs.js)
+sim/local/results/prim-tmp/
