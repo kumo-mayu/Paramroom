@@ -2,7 +2,7 @@
 // Paramroom local transport probe - OSC sender (docs/research/12). No dependencies.
 // Writes the probe avatar's LOCAL Float parameters PRL0..PRL{K-1} (not synced: nothing reaches other players).
 //
-//   node local-probe.js run   --k 512 [--groups 16] [--chunks 1024] [--rate 60] [--passes 2] [--maxbytes 4000]
+//   node local-probe.js run   --k 512 [--groups 16] [--chunks 1024] [--rate 60] [--passes 2] [--maxbytes 1400]
 //                             [--settle 500] [--tail 1000]
 //   node local-probe.js hud 0|1          # the overlay on / off
 //   node local-probe.js clear            # new session: clears the store and the statistics
@@ -90,7 +90,7 @@ async function run() {
   const chunks = Number(opt('chunks', 1024));
   const rate = Number(opt('rate', 60));
   const passes = Number(opt('passes', 2));
-  const maxBytes = Number(opt('maxbytes', 4000));
+  const maxBytes = Number(opt('maxbytes', 1400));   // one group per datagram: VRChat drops datagrams over ~4 KB (measured 2026-09-19)
   const settle = Number(opt('settle', 500)), tail = Number(opt('tail', 1000));
   if (groups * 32 > K) throw new Error('groups * 32 > k');
   const session = 1 + Math.floor(Math.random() * 1e6);
@@ -128,6 +128,9 @@ async function run() {
     log.push(`${s},${(tStart - t0).toFixed(3)},${(performance.now() - t0).toFixed(3)},${dgs.length},${dgs.reduce((a, d) => a + d.length, 0)},${first}`);
   }
   const elapsed = performance.now() - t0;
+  // zero every parameter, so the last send is not taken again as the next session starts
+  await sleep(100);
+  for (let g = 0; g < groups; g++) await send(bundle(Array.from({ length: 32 }, (_, j) => floatBitsMsg(addrs[g * 32 + j], 0))));
   await sleep(tail);
   const dir = path.join(__dirname, '..', 'logs');
   fs.mkdirSync(dir, { recursive: true });
@@ -139,9 +142,40 @@ async function run() {
     payloadKbitPerSec: Math.round(totalSends * groups * 868 / elapsed), lateSends: late, log: path.relative(process.cwd(), file) }));
 }
 
+// Load only, to split the frame cost of receiving OSC from the cost of what the values change:
+//   --mode bogus  addresses the avatar does not have (parse + dispatch only)
+//          same   the probe's parameters, the same values every time (no parameter changes)
+//          change the probe's parameters, new values every time (as run)
+async function flood() {
+  const groups = Number(opt('groups', 16)), rate = Number(opt('rate', 60)), seconds = Number(opt('seconds', 12));
+  const mode = opt('mode', 'bogus');
+  const name = i => mode === 'bogus' ? `PRX${i}` : `${prefix}${i}`;
+  const addrs = Array.from({ length: groups * 32 }, (_, i) => oscString(`/avatar/parameters/${name(i)}`));
+  const period = 1000 / rate, t0 = performance.now();
+  let s = 0;
+  while (performance.now() - t0 < seconds * 1000) {
+    const due = t0 + s * period;
+    const now = performance.now();
+    if (now < due - 2) await sleep(due - now - 2);
+    while (performance.now() < due) { /* spin */ }
+    const v = mode === 'change' ? s : 1;
+    for (let g = 0; g < groups; g++)
+      await send(bundle(Array.from({ length: 32 }, (_, j) => floatBitsMsg(addrs[g * 32 + j], enc(v & 3, (v * 7919 + g * 32 + j) & 0xFFFFFFF)))));
+    s++;
+  }
+  if (mode !== 'bogus') for (let g = 0; g < groups; g++) await send(bundle(Array.from({ length: 32 }, (_, j) => floatBitsMsg(addrs[g * 32 + j], 0))));
+  console.log(JSON.stringify({ mode, groups, rate, sends: s, msgsPerSec: Math.round(s * groups * 32 / seconds) }));
+}
+
 (async () => {
   try {
     if (cmd === 'run') await run();
+    else if (cmd === 'flood') await flood();
+    else if (cmd === 'avatar') {
+      // switch to one of the user's probe avatars: /avatar/change <avtr_...>
+      const a = oscString('/avatar/change'), t = oscString(',s'), v = oscString(argv[1]);
+      await send(Buffer.concat([a, t, v]));
+    }
     else if (cmd === 'hud') await setParam('PRH', Number(argv[1] ?? 1));
     else if (cmd === 'clear') { await setParam('PRS', 1 + Math.floor(Math.random() * 1e6)); await setParam('PRT', 0); }
     else { console.log('usage: node local-probe.js run|hud|clear ... (see the header)'); process.exitCode = 1; }
