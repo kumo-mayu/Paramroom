@@ -1,5 +1,6 @@
 # 同じビット数での見比べ（docs/research/12）
-n> テスト画像には CC BY-SA のものが含まれる。この画像を再配布するときは `sim/images/SOURCES.txt` の帰属表示を一緒に持っていくこと。
+
+> テスト画像には CC BY-SA のものが含まれる。この画像を再配布するときは `sim/images/SOURCES.txt` の帰属表示を一緒に持っていくこと。
 
 シミュレーション。各方式で「そのビット数以下で MS-SSIM(YCbCr) が最良の設定」の復元画像。
 `sheet.png` は左から: 元画像, dctc (chunk-packed), dctc (chunk-packed, 4:4:4), wavelet97 (4:4:4), bc1 (4x4,565,2bit=4bpp), blk (8x8,565,2bit=2.5bpp), pal-global, raw-ycc420-6.5, prim-ellipse (1024, C#)（256×256 の切り出し、等倍）。
