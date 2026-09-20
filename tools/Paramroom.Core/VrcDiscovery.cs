@@ -86,11 +86,12 @@ public static class VrcDiscovery
 {
     public const int MaxParams = 32;
 
-    // One-shot search for the CLI: a temporary service that lives only for this call. The app keeps one VrcConnection
-    // instead, so that it does not announce itself on new ports every time it looks (see VrcConnection).
+    // One-shot search for the CLI: browse only, announcing nothing. Two processes announcing the same service name
+    // overwrite each other on mDNS (see VrcConnection), and the CLI has no use for /avatar/change anyway. The app keeps
+    // one announcing VrcConnection instead of building one per search.
     public static async Task<List<VrcClient>> FindAsync(double waitSec)
     {
-        using var conn = new VrcConnection();
+        using var conn = new VrcConnection(advertise: false);
         return await InspectAllAsync(await conn.VrchatServicesAsync(waitSec));
     }
 

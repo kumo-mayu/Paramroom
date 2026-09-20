@@ -162,4 +162,18 @@ public class ConnectionTests
 
         Assert.Empty(OscParse.AvatarChanges(new byte[] { 1, 2, 3 }));   // garbage is ignored, not thrown
     }
+
+    // Two processes announcing the same mDNS name overwrite each other's record (docs/research/14), so the announced
+    // name carries the process id, and a search that only browses (the CLI) announces nothing at all - no announcement
+    // means no UDP port for /avatar/change either.
+    [Fact]
+    public void TheAnnouncedNameCarriesTheProcessIdAndBrowsingAnnouncesNothing()
+    {
+        Assert.StartsWith(VrcConnection.ServiceNamePrefix + "-", VrcConnection.NewServiceName());
+        Assert.EndsWith("-" + Environment.ProcessId, VrcConnection.NewServiceName());
+
+        using var browse = new VrcConnection(advertise: false);
+        Assert.Equal(0, browse.UdpPort);
+        Assert.Equal(0, browse.TcpPort);
+    }
 }

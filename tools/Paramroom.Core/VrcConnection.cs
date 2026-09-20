@@ -9,6 +9,11 @@
 // swapped (the same approach as the author's vrc-osc-recorder). A swap is then "read the avatar again" rather than
 // "find VRChat again". The receiving port is bound to loopback only: VRChat runs on the same PC, and a socket open to the
 // LAN could trigger a firewall prompt.
+//
+// Two things keep one announcement from being disturbed by another process (measured 2026-09-20, docs/research/14):
+//   - the announced name carries the process id, because two processes with the same name overwrite each other's mDNS
+//     record back and forth instead of one of them being renamed
+//   - a one-shot search (the CLI) is built with `advertise: false`: browsing needs no announcement at all
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -18,22 +23,38 @@ namespace Paramroom;
 
 public sealed class VrcConnection : IDisposable
 {
-    public const string ServiceName = "Paramroom-Sender";
+    public const string ServiceNamePrefix = "Paramroom-Sender";
+
+    // mDNS has no conflict resolution here: two processes announcing the same service name keep overwriting each
+    // other's SRV record (measured 2026-09-20, measure/osc/mdns-watch.js), and whoever asks gets whichever answer came
+    // last - so VRChat can end up sending /avatar/change to a port that has already gone. The name therefore carries
+    // the process id.
+    public static string NewServiceName() => $"{ServiceNamePrefix}-{Environment.ProcessId}";
 
     readonly OSCQueryService service;
-    readonly UdpClient udp;
+    readonly UdpClient? udp;
     readonly CancellationTokenSource cts = new();
     readonly Dictionary<string, OSCQueryServiceProfile> seen = new();
     bool swept;
 
+    public string ServiceName { get; }
     public int TcpPort { get; }
     public int UdpPort { get; }
 
     // raised on a background thread with the new avatar ID
     public event Action<string>? AvatarChanged;
 
-    public VrcConnection()
+    // advertise: announce this app over mDNS so VRChat sends /avatar/change here. Only the app needs that; a one-shot
+    // search (the CLI) just browses, which needs no announcement at all and so cannot collide with the running app.
+    public VrcConnection(bool advertise = true)
     {
+        ServiceName = NewServiceName();
+        if (!advertise)
+        {
+            service = new OSCQueryServiceBuilder().WithDiscovery(new MeaModDiscovery()).Build();
+            service.OnOscQueryServiceAdded += Remember;
+            return;
+        }
         udp = new UdpClient(new IPEndPoint(IPAddress.Loopback, 0));
         UdpPort = ((IPEndPoint)udp.Client.LocalEndPoint!).Port;
         TcpPort = Extensions.GetAvailableTcpPort();
@@ -78,7 +99,7 @@ public sealed class VrcConnection : IDisposable
         while (!ct.IsCancellationRequested)
         {
             int n;
-            try { n = await udp.Client.ReceiveAsync(buffer.AsMemory(), SocketFlags.None, ct); }
+            try { n = await udp!.Client.ReceiveAsync(buffer.AsMemory(), SocketFlags.None, ct); }
             catch (OperationCanceledException) { return; }
             catch (ObjectDisposedException) { return; }
             catch (SocketException) { continue; }   // e.g. a reset from an ICMP reply; keep listening
@@ -93,7 +114,7 @@ public sealed class VrcConnection : IDisposable
     {
         cts.Cancel();
         service.OnOscQueryServiceAdded -= Remember;
-        udp.Dispose();
+        udp?.Dispose();
         service.Dispose();
         cts.Dispose();
     }
