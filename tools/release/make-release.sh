@@ -1,7 +1,11 @@
 #!/bin/bash
 # リリースの配布物を作る: exe・unitypackage・LICENSE・THIRD-PARTY-NOTICES.txt・README.txt と、BOOTH 用の zip。
 #
-#   bash tools/release/make-release.sh v0.2.1 v0.2.0 D:/work/ClaudeCode/Paramroom-release
+#   bash tools/release/make-release.sh v0.2.1 v0.2.0 D:/work/ClaudeCode/Paramroom-release [ShotLink の版]
+#
+# 4つ目は zip に同梱する ShotLink の版（既定は latest＝公開済みの最新。none で入れない）。
+# ShotLink は写真に写った QR を PC で受け取るアプリで、Paramroom の QR モードのおまけ。
+# 取ってくるのは tools/release/fetch-shotlink.sh（フォルダごと入れる理由もそこに書いた）。
 #
 # unitypackage は「前の版の unitypackage」を土台にする。リポジトリに .meta が無いので、GUID は
 # 前の版からしか引き継げない。GUID が変わると、インポートしたときに上書きされず別物として入り、
@@ -10,7 +14,7 @@
 #
 # zip の README は docs/booth/zip-README.txt。版ごとに先に直しておく。
 set -euo pipefail
-V=$1; PREV=$2; BASE=${3:-D:/work/ClaudeCode/Paramroom-release}
+V=$1; PREV=$2; BASE=${3:-D:/work/ClaudeCode/Paramroom-release}; SHOTLINK=${4:-latest}
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 OUT="$BASE/$V"; WORK=$(mktemp -d)
 mkdir -p "$OUT"
@@ -39,7 +43,15 @@ crlf "$ROOT/LICENSE" "$OUT/LICENSE"
 crlf "$ROOT/THIRD-PARTY-NOTICES.txt" "$OUT/THIRD-PARTY-NOTICES.txt"
 crlf "$ROOT/docs/booth/zip-README.txt" "$OUT/README.txt"
 
+# ShotLink（おまけ）をフォルダごと置く
+SHOTLINK_PATH=""
+if [ "$SHOTLINK" != none ]; then
+  SHOTLINK_DIR=$(bash "$ROOT/tools/release/fetch-shotlink.sh" "$SHOTLINK" "$OUT")
+  SHOTLINK_PATH=",'$OUT/$SHOTLINK_DIR'"
+  echo "同梱する ShotLink: $SHOTLINK_DIR"
+fi
+
 # BOOTH 用の zip（無料版・支援版の両方にこれを付ける）
-powershell -NoProfile -Command "Compress-Archive -Force -DestinationPath '$OUT/Paramroom-$V.zip' -Path '$OUT/Paramroom-unity-$V.unitypackage','$OUT/Paramroom.App.exe','$OUT/LICENSE','$OUT/THIRD-PARTY-NOTICES.txt','$OUT/README.txt'"
+powershell -NoProfile -Command "Compress-Archive -Force -DestinationPath '$OUT/Paramroom-$V.zip' -Path '$OUT/Paramroom-unity-$V.unitypackage','$OUT/Paramroom.App.exe','$OUT/LICENSE','$OUT/THIRD-PARTY-NOTICES.txt','$OUT/README.txt'$SHOTLINK_PATH"
 rm -rf "$WORK"
 ls -la "$OUT"

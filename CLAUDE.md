@@ -249,6 +249,12 @@ unitypackage は中身が変わるので新しいものを添付し、「作り�
 THIRD-PARTY-NOTICES.txt・README.txt・BOOTH 用の zip がまとめてできる（出力先の既定は
 `D:/work/ClaudeCode/Paramroom-release`。リポジトリの外）。先に `docs/booth/zip-README.txt` を直す。
 
+- **BOOTH 用の zip には ShotLink（写真に写った QR を PC で受け取るアプリ。別リポジトリ `kumo-mayu/shotlink`）を
+  おまけとしてフォルダごと同梱する。** 4つ目の引数で版を選ぶ（既定 `latest`＝公開済みの最新、`none` で入れない）。
+  取ってくるのは `tools/release/fetch-shotlink.sh`（ShotLink の zip に添えた `.sha256` で確かめる）。
+  ShotLink を更新するたびに Paramroom を差し替えはしない。Paramroom の版を出すときに、その時点の最新を入れる。
+  ShotLink の公開前は `latest` が見つからずに止まるので、`none` を付ける。zip の README の「（版）」は、入れた版に直す
+
 - **unitypackage の GUID は前の版から引き継ぐ。** リポジトリに `.meta` が無いので、スクリプトは
   前の版の unitypackage を土台に中身だけ差し替える。GUID が変わると上書きされず、
   生成済みのプレハブがシェーダーを見失う。ファイルを足したときは Unity で書き出す
@@ -265,7 +271,7 @@ GitHub の Releases と**同じ中身**を BOOTH にも置く。BOOTH の規約�
 
 - バリエーションは「無料版」（¥0）と「支援版(中身は同じ)」（¥500）。**両方に同じ zip** を付ける
 - zip の名前は `Paramroom-v0.X.Y.zip`。中身は `Paramroom-unity-v0.X.Y.unitypackage`・`Paramroom.App.exe`・
-  `LICENSE`・`THIRD-PARTY-NOTICES.txt`・`README.txt`（導入手順と「作り直しが要るか」）
+  `LICENSE`・`THIRD-PARTY-NOTICES.txt`・`README.txt`（導入手順と「作り直しが要るか」）と、おまけの `ShotLink-v<版>/`
 - **GitHub の Releases にも `THIRD-PARTY-NOTICES.txt` を毎回添付する**（exe に MIT のライブラリと
   .NET ランタイムが入っているので、表示を付けて配る義務がある。`THIRD-PARTY.md`）
 - 版を出すたびに、**両方のバリエーションの zip を差し替え**、本文の版番号（同梱物・使用方法のファイル名）と「更新履歴」を直す（商品名には版番号を入れていない）。

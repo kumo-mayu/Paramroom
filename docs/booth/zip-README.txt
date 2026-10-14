@@ -28,6 +28,7 @@ VRChat のアバターに、PC の画像や QR コードを送って周りの人
   LICENSE                               … Paramroom のライセンス（MIT）
   THIRD-PARTY-NOTICES.txt               … アプリが使っているライブラリのライセンス
   README.txt                            … このファイル
+  ShotLink-v（版）/                     … おまけ：写真に写った QR コードを PC で受け取るアプリ（下の「おまけ」）
 
 
 ■ 必要なもの
@@ -64,6 +65,18 @@ VRChat のアバターに、PC の画像や QR コードを送って周りの人
 
   初回起動時に「Windows によって PC が保護されました」と出たら、
   「詳細情報」→「実行」で起動できます（exe に電子署名をしていないためです）。
+
+
+■ おまけ：ShotLink
+
+  VRChat で撮った写真に QR コードが写っていたら、その中身を Windows の通知で知らせるアプリです。
+  Paramroom で自分のアバターに出した QR コードを、見ている人がカメラで撮るだけで PC に受け取れます。
+  見せる相手にも渡せます（MIT ライセンスなので、そのまま配って構いません）。
+  ShotLink-v（版）フォルダの ShotLink.exe を起動して、QR コードが写るように写真を撮るだけで使えます。
+  使い方・消し方は、同じフォルダの README.txt にあります。
+
+  ここに入っているのは、この Paramroom を出した時点の版です。最新版は ShotLink の配布ページから。
+    GitHub : https://github.com/kumo-mayu/shotlink
 
 
 ■ 注意
