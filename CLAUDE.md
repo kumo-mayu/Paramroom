@@ -15,9 +15,9 @@ VRChat のアバターの**同期パラメータ（Int 最大 32 個 = 256 bit�
 | `docs/design/` | 伝送方式の比較と決定 | 方式を変えようとするとき |
 | `docs/measure/` | 実機測定の手順と結果 | 実機で測るとき |
 | `measure/results/` | 比較画像・測定データ | 画質を語るとき |
+| `docs/dev/notes.md` | 覚えておくと早いこと（実測）・つまずきやすいところ・大きいファイルの読み方 | 作業の前に一度。大きいファイルを開く前 |
 
-**返答・途中経過・報告はすべて日本語で書く。** 長い作業の最後のまとめも例外にしない。
-コード中のコメントと識別子は英語でよい。
+コード中のコメントと識別子は英語でよい（下の「書き方」）。
 
 ---
 
@@ -50,10 +50,8 @@ v0.2.0 の不具合修正は**受信側だけ**で済ませたので、古い送
 
 ### 4. 外向きの操作は確認を取る
 
-`git push` は**その場で頼まれたときだけ**行う（全プロジェクト共通の決まり、2026-10-20）。リリースの公開・リポジトリの設定変更・削除も、
+`git push`・コミットの末尾の行は共通の決まりどおり（push は**その場で頼まれたときだけ**）。リリースの公開・リポジトリの設定変更・削除も、
 必ず確認してから。コミットまではこちらでよい。**このリポジトリは公開**なので、commit に入れた物は誰でも読める。
-
-コミットの末尾は `Co-Authored-By: Claude ...` の 1 行だけ。**`Claude-Session:` の URL は付けない**。
 
 ---
 
@@ -98,9 +96,7 @@ VRChat は OSC バンドルを 1 フレームで適用しきれないことが�
 - **CLI は名乗らない**（`new VrcConnection(advertise: false)`）。探すだけなら名乗りは要らない
 - 名乗りを確かめるときは `node measure/osc/mdns-watch.js --filter Paramroom`（受信だけ）。
   **古いビルドで測らない**（`bin/Release` に前の版が残る。09-18 のビルドで「13 秒ごとに名乗り直す」を再現してしまった）
-- `ConnectionTests` がこれを見ている（偽の OSCQuery サーバーで、探し直した回数を数える）
-- 実機で確認済み（2026-09-19、ユーザー）：名乗り直しが止まる／Paramroom 入りに着替えると**数秒**で送信先になる
-  （10 秒の見回りより速いので /avatar/change が届いていると見られる）／送信中の着替えで止まる／VRChat 再起動で見つけ直す
+- `ConnectionTests` がこれを見ている（偽の OSCQuery サーバーで、探し直した回数を数える）。実機の確認記録は `docs/dev/notes.md`
 
 ### 参照実装とビット単位で一致させる
 
@@ -153,14 +149,7 @@ cd sim && node selftest.js                       # 符号化→順序を混ぜ�
 **コンパイルが通っただけで済ませない。** 受信側はカメラループの状態機械なので、
 実際に回さないと「取り込む／取り込まない」「描き直す／描き直さない」が分からない。
 
-**`shader-check` スキルを使う。** Unity 2022.3.22f1 ＋ VRChat SDK ＋ Modular Avatar の入った
-プロジェクトが要る（このリポジトリには含まれない。作業用に一時プロジェクトを作る）。
-
-```bash
-bash .claude/skills/shader-check/scripts/run-unity-test.sh <proj> shader prim-kodim23
-bash .claude/skills/shader-check/scripts/run-unity-test.sh <proj> qr qronly-25x25-4int
-bash .claude/skills/shader-check/scripts/run-unity-test.sh <proj> build
-```
+**`shader-check` スキルを使う**（Unity 2022.3.22f1 ＋ VRChat SDK ＋ Modular Avatar の一時プロジェクトが要る。コマンドはスキルに）。
 
 ### 試験が本当に効くかを一度確かめる
 
@@ -174,116 +163,25 @@ bash .claude/skills/shader-check/scripts/run-unity-test.sh <proj> build
 `sim/` に道具がある（16 枚の画像で平均を取る）。実機は `measure/osc/` の道具と
 `docs/measure/procedure.md` の手順。
 
----
-
-## 覚えておくと早いこと（すべて実測）
-
-- 保持 **100 ms** で取りこぼしほぼ 0、80 ms で 1 割落ちる。受信側の更新は 83〜100 ms ごと
-- **アバターのパラメータは 1 フレームに 1 回更新される**（10 fps 制限で 100 ms、60 fps で 17 ms 間隔）。
-  公式ドキュメントに記載は無い。OSC の**入力**はフレームに縛られず 1 つも落とさない
-- **受信側が 30 fps 未満だと届きにくい**（半端パケットの判定に 2 フレーム要るため）。
-  100 ms のとき 30 fps で全部届き、20 fps で少し取りこぼし、10 fps でほぼ止まる
-- OSC バンドルでも **0.3%** は半端パケットになる
-- 同じ blueprint ID のアバターを 2 人以上が着ると RenderTexture を共有して壊れる
-- アバター上のカメラがリモートで動くのは**フレンドか Show Avatar を押した人だけ**。Quest では動かない
-- 画像は 1 周 80 秒（形式 4 ＋ 32 Int。形式 3・5 は 100 秒）。全部揃うのは 1 周の 8/7 倍（形式 4 で 92 秒）。QR は Int の数しだいで 0.3〜3 秒、QR 専用なら Int 3 個から
-
-### つまずきやすいところ
-
-- **`bash` のヒアドキュメントはバックスラッシュを壊すことがある。**
-  `\\` を含むスクリプトは Write ツールでファイルに書いてから実行する
-- C# の出力と node の出力を `diff` すると、**CRLF と LF** で全行が差分になる。`tr -d '\r'` を通す
-- C# と JS で同じ文字列から QR を作っても、**ライブラリがマスクを別に選ぶ**ので一致しない。
-  詰め方を比べるときは**同じマス目を両方に食わせる**
-- 送信アプリを起動したままだとビルドが失敗する（上記「絶対に破らないこと 2」）
-
----
-
-## 読み方（文脈を節約する）
-
-**大きいファイルを丸ごと読まない。** `Grep` で場所を絞り、`Read` の `offset`/`limit` で近くだけ読む。
-編集した直後に読み直さない。ビルド・テストの出力は末尾だけ出す。
-
-| ファイル | 大きさ | 読み方 |
-|---|---|---|
-| `docs/research/08-primitive-representation-experiments.md` | 46KB | 見出しを Grep して節だけ。符号化方式の実験の全記録 |
-| `sim/codecs/primx.js` | 46KB | 研究用の変種置き場。本番は `prim.js` |
-| `docs/research/07`・`01`、`docs/design/02` | 29〜37KB | 根拠を辿るときだけ |
-| `measure/unity/.../Editor/ParamroomBuilder.cs` | 34KB | 関数名で Grep（`Build`・`BuildQr`・`GoodLayouts`・`QrLayoutFor`） |
-| `tools/Paramroom.Core/Session/ParamroomSession.cs` | 30KB | `StartEncode`・`RenderReceived`・`SendLoop` などで Grep |
-| `tools/Paramroom.Core/PrimEncoder.cs` | 28KB | 符号化の本体。触る前に `docs/research/08` を読む |
-| `tools/Paramroom.App/ViewModels/MainViewModel.cs` | 27KB | 表示文言はここ。`HoldOptions`・`QrNoteFor` などで Grep |
-| `.../Shaders/ParamroomDecoder.shader` | 23KB | 冒頭のコメントに状態アトラスの地図がある。そこだけ読めば構造が分かる |
+覚えておくと早いこと（実測の数字）・つまずきやすいところ・大きいファイルの読み方は `docs/dev/notes.md`。
 
 ---
 
 ## 進め方
 
-- **コミットはこまめに。プッシュは頼まれたときだけ。**
-- コミットメッセージは**何をしたか**ではなく**なぜそうしたか**と**何で確かめたか**を書く。既存のログに倣う
-- 仕様を変えたら `docs/` と `README.md` にも書く。**コードだけ直して文書を置き去りにしない**
-- 判断が要るところは勝手に決めず、**選択肢と根拠を出して聞く**
+- コミットメッセージには、なぜに加えて**何で確かめたか**を書く。既存のログに倣う（`.claude/wrap-up.md`）
 - 実機での確認はユーザーが行う。**こちらは実機で確かめられることと確かめられないことを分けて伝える**
 
-### リリースの出しかた
+### リリース
 
-**期間で区切らない。「アバターの作り直しが要るか」で分ける。**
-利用者の手間が桁違いに違うので、そこが分かれ目になる。
-
-| 変更の種類 | 利用者の手間 | 出し方 | 版 |
-|---|---|---|---|
-| **アプリだけ** | exe を置き換えるだけ（30 秒） | **溜めずに出す。** 実害のある不具合を直したらその日のうち | パッチ（0.2.**1**） |
-| **シェーダー・プレハブ** | Unity を開く→作り直す→アップロード→反映待ち（30 分以上） | **溜めてから出す。** 月 1 回以下 | マイナー（0.**3**.0） |
-
-ビルダーの既定や文言だけの変更（できるプレハブは同じ）は**作り直し不要**なので、パッチで出してよい。
-unitypackage は中身が変わるので新しいものを添付し、「作り直しは不要」とノートに書く。
-
-- **アバターの作り直しが要るかどうかを、リリースノートの冒頭に必ず書く**
-- **公開したリリースの中身は動かさない。** 差し替えたくなったら新しい版を出す
-- unitypackage が前の版と同じでも**毎回添付する**。「どれとどれを組み合わせるのか」で迷わせない
-  （同じであることはノートに書く）
-
-#### 配布物の作り方
-
-`bash tools/release/make-release.sh v0.X.Y <前の版> [出力先]` で、exe・unitypackage・LICENSE・
-THIRD-PARTY-NOTICES.txt・README.txt・BOOTH 用の zip がまとめてできる（出力先の既定は
-`D:/work/ClaudeCode/Paramroom-release`。リポジトリの外）。先に `docs/booth/zip-README.txt` を直す。
-
-- **BOOTH 用の zip には ShotLink（写真に写った QR を PC で受け取るアプリ。別リポジトリ `kumo-mayu/shotlink`）を
-  おまけとしてフォルダごと同梱する。** 4つ目の引数で版を選ぶ（既定 `latest`＝公開済みの最新、`none` で入れない）。
-  取ってくるのは `tools/release/fetch-shotlink.sh`（ShotLink の zip に添えた `.sha256` で確かめる）。
-  ShotLink を更新するたびに Paramroom を差し替えはしない。Paramroom の版を出すときに、その時点の最新を入れる。
-  ShotLink の公開前は `latest` が見つからずに止まるので、`none` を付ける。zip の README の「（版）」は、入れた版に直す
-
-- **unitypackage の GUID は前の版から引き継ぐ。** リポジトリに `.meta` が無いので、スクリプトは
-  前の版の unitypackage を土台に中身だけ差し替える。GUID が変わると上書きされず、
-  生成済みのプレハブがシェーダーを見失う。ファイルを足したときは Unity で書き出す
-- **公開したら、添付物がスクリプトの出力と同じかをハッシュで突き合わせる**（`gh release download` して `sha256sum`）。
-  v0.2.1 では、GitHub に v0.2.0 と同じ unitypackage が付き、THIRD-PARTY-NOTICES.txt も付いていなかった
-  （2026-09-19 に v0.2.2 の準備中に気づき、v0.2.2 のノートで訂正した）
-- exe は `IncludeNativeLibrariesForSelfExtract` と `EnableCompressionInSingleFile` を付けて作る。
-  無いと WPF のネイティブ DLL が外に出て、exe 1 つでは起動できない
-
-#### BOOTH（`kumo-mayu.booth.pm`、カテゴリ「ソフトウェア」）
-
-GitHub の Releases と**同じ中身**を BOOTH にも置く。BOOTH の規約で、外部サイトへ案内するだけの商品は
-禁止されているので、**「GitHub から取ってください」で済ませない**。
-
-- バリエーションは「無料版」（¥0）と「支援版(中身は同じ)」（¥500）。**両方に同じ zip** を付ける
-- zip の名前は `Paramroom-v0.X.Y.zip`。中身は `Paramroom-unity-v0.X.Y.unitypackage`・`Paramroom.App.exe`・
-  `LICENSE`・`THIRD-PARTY-NOTICES.txt`・`README.txt`（導入手順と「作り直しが要るか」）と、おまけの `ShotLink-v<版>/`
-- **GitHub の Releases にも `THIRD-PARTY-NOTICES.txt` を毎回添付する**（exe に MIT のライブラリと
-  .NET ランタイムが入っているので、表示を付けて配る義務がある。`THIRD-PARTY.md`）
-- 版を出すたびに、**両方のバリエーションの zip を差し替え**、本文の版番号（同梱物・使用方法のファイル名）と「更新履歴」を直す（商品名には版番号を入れていない）。
-  更新履歴にも「アバターの作り直しが要るか」を書く
-- 差し替え・公開は**ユーザーが自分で行う**（外向きの操作）。こちらは zip と文面の用意まで
+**期間で区切らない。「アバターの作り直しが要るか」で分ける。** アプリだけの変更は溜めずにパッチで出し、
+シェーダー・プレハブの変更は溜めてマイナーで出す（月 1 回以下）。作り直しが要るかをノートの冒頭に必ず書き、
+公開したリリースの中身は動かさない（差し替えたいなら新しい版）。手順・配布物・BOOTH は `release` スキル（`.claude/skills/release/SKILL.md`）。
 
 ### スキル（`.claude/skills/`）
 
-| スキル | 使うとき |
-|---|---|
-| `shader-check` | 受信側（シェーダー・プレハブ生成）を Unity の batchmode で実際に動かす |
-| `ui-check` | 送信アプリの画面を確かめる（宛先を固定して起動・UI Automation・撮影） |
+- `shader-check`：受信側（シェーダー・プレハブ生成）を Unity の batchmode で実際に動かす
+- `ui-check`：送信アプリの画面を確かめる（宛先を固定して起動・UI Automation・撮影）
+- `release`：版を出す（`/release` で呼ぶ）
+- 仕上げは harness プラグインの `wrap-up` スキル。Paramroom だけの手順（テスト・文書の表・個人情報の点検）は `.claude/wrap-up.md`
 
-仕上げは harness プラグイン（`D:\work\ClaudeCode\claude-harness`）の `wrap-up` スキルで、Paramroom だけの手順（テスト・文書の表・個人情報の点検）は `.claude/wrap-up.md`。
-全プロジェクト共通の決まりは `D:\work\ClaudeCode\CLAUDE.md`。
