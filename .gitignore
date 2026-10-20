@@ -20,3 +20,7 @@ tools/**/bin/
 tools/**/obj/
 # primitive runs of the local-transfer codec study (regenerable with sim/local/prim-cs.js)
 sim/local/results/prim-tmp/
+
+# Claude Code の手元の物（作業用の worktree・個人の設定）
+.claude/worktrees/
+.claude/settings.local.json
