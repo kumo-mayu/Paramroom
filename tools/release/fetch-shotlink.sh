@@ -2,7 +2,7 @@
 # ShotLink（写真に写った QR を PC で受け取るアプリ。Paramroom のおまけ）の配布物を取ってきて、
 # 出力先にフォルダのまま展開する。展開したフォルダ名（ShotLink-v1.0.0 など）を標準出力に出す。
 #
-#   bash tools/release/fetch-shotlink.sh latest D:/work/ClaudeCode/Paramroom-release/v0.2.3
+#   bash tools/release/fetch-shotlink.sh latest ../Paramroom-release/v0.2.3
 #   bash tools/release/fetch-shotlink.sh v1.0.0 <出力先>
 #   SHOTLINK_ZIP=<手元の ShotLink-v1.0.0.zip> bash tools/release/fetch-shotlink.sh latest <出力先>   # 試すとき
 #

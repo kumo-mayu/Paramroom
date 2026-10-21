@@ -30,7 +30,7 @@ unitypackage は中身が変わるので新しいものを添付し、「作り�
 
 `bash tools/release/make-release.sh v0.X.Y <前の版> [出力先]` で、exe・unitypackage・LICENSE・
 THIRD-PARTY-NOTICES.txt・README.txt・BOOTH 用の zip がまとめてできる（出力先の既定は
-`D:/work/ClaudeCode/Paramroom-release`。リポジトリの外）。先に `docs/booth/zip-README.txt` を直す。
+リポジトリの隣の `Paramroom-release`。リポジトリの外）。先に `docs/booth/zip-README.txt` を直す。
 
 - **BOOTH 用の zip には ShotLink（写真に写った QR を PC で受け取るアプリ。別リポジトリ `kumo-mayu/shotlink`）を
   おまけとしてフォルダごと同梱する。** 4つ目の引数で版を選ぶ（既定 `latest`＝公開済みの最新、`none` で入れない）。

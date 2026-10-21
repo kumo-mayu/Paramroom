@@ -1,5 +1,5 @@
-# Paramroom 送信アプリの画面を確かめる道具（booth-asset-manager の ui-check を元にした）。呼び出しごとにドットで読み込む：
-#   . "D:\work\ClaudeCode\avatar-image-pad\.claude\skills\ui-check\scripts\ui-kit.ps1"
+# Paramroom 送信アプリの画面を確かめる道具（booth-asset-manager の ui-check を元にした）。呼び出しごとにドットで読み込む（プロジェクト直下から）：
+#   . ".\.claude\skills\ui-check\scripts\ui-kit.ps1"
 #
 # - 起動するときは必ず PARAMROOM_TARGET で宛先を固定する（既定は 127.0.0.1:9131）。確かめの操作で、ユーザが開いている
 #   VRChat のアバターに勝手に送らないため。VRChat へ送る確かめは、ユーザに告げてから -AllowVRChat で起動する
