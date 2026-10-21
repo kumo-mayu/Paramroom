@@ -1,4 +1,4 @@
-Paramroom v0.2.2
+Paramroom v0.2.3
 ================
 
 VRChat のアバターに、PC の画像や QR コードを送って周りの人に見せるギミックです。
@@ -13,22 +13,22 @@ VRChat のアバターに、PC の画像や QR コードを送って周りの人
 
   アバターの作り直しは不要です（v0.2.0 以降で作ったアバターはそのまま使えます）。
   送信アプリ（Paramroom.App.exe）を置き換えるだけで済みます。
+  unitypackage の中身は v0.2.2 と同じです。
   v0.1.0 から上げる場合は、プレハブを作り直してください。
 
-  - Paramroom の入っていないアバターを着ていると、送信アプリが 10 秒ごとに VRChat へ
-    接続し直していた不具合を直しました。接続は起動中 1 回だけになります
-  - アバターを着替えると、数秒で送信先が切り替わるようになりました
-  - 説明文の直し（画像は 80 秒ほどで「ほぼ」揃い、全部揃うまでは 90 秒ほど）
+  - おまけの ShotLink（写真に写った QR コードを PC で受け取るアプリ）を同梱しました
+  - 送信アプリと CLI を同時に動かしていると、VRChat がどちらに送るか定まらず、
+    片方を閉じたあとに届かなくなることがあった不具合を直しました
 
 
 ■ 入っているもの
 
-  Paramroom-unity-v0.2.2.unitypackage … アバターへの導入ツール（Unity にインポートする）
+  Paramroom-unity-v0.2.3.unitypackage … アバターへの導入ツール（Unity にインポートする）
   Paramroom.App.exe                     … 画像を送る Windows アプリ（インストール不要）
   LICENSE                               … Paramroom のライセンス（MIT）
   THIRD-PARTY-NOTICES.txt               … アプリが使っているライブラリのライセンス
   README.txt                            … このファイル
-  ShotLink-v（版）/                     … おまけ：写真に写った QR コードを PC で受け取るアプリ（下の「おまけ」）
+  ShotLink-v1.0.0/                      … おまけ：写真に写った QR コードを PC で受け取るアプリ（下の「おまけ」）
 
 
 ■ 必要なもの
@@ -41,7 +41,7 @@ VRChat のアバターに、PC の画像や QR コードを送って周りの人
 
 ■ アバターに入れる
 
-  1. Paramroom-unity-v0.2.2.unitypackage をプロジェクトにインポートする
+  1. Paramroom-unity-v0.2.3.unitypackage をプロジェクトにインポートする
      （Assets/kumo-mayu/Paramroom に入ります）
   2. ヒエラルキーで導入したいアバターを選ぶ
   3. Tools > Paramroom > Decoder Builder を開き、収まる Int の数を選んで「プレハブを作成」
@@ -72,7 +72,7 @@ VRChat のアバターに、PC の画像や QR コードを送って周りの人
   VRChat で撮った写真に QR コードが写っていたら、その中身を Windows の通知で知らせるアプリです。
   Paramroom で自分のアバターに出した QR コードを、見ている人がカメラで撮るだけで PC に受け取れます。
   見せる相手にも渡せます（MIT ライセンスなので、そのまま配って構いません）。
-  ShotLink-v（版）フォルダの ShotLink.exe を起動して、QR コードが写るように写真を撮るだけで使えます。
+  ShotLink-v1.0.0 フォルダの ShotLink.exe を起動して、QR コードが写るように写真を撮るだけで使えます。
   使い方・消し方は、同じフォルダの README.txt にあります。
 
   ここに入っているのは、この Paramroom を出した時点の版です。最新版は ShotLink の配布ページから。
