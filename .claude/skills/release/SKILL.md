@@ -42,8 +42,7 @@ THIRD-PARTY-NOTICES.txt・README.txt・BOOTH 用の zip がまとめてできる
   前の版の unitypackage を土台に中身だけ差し替える。GUID が変わると上書きされず、
   生成済みのプレハブがシェーダーを見失う。ファイルを足したときは Unity で書き出す
 - **公開したら、添付物がスクリプトの出力と同じかをハッシュで突き合わせる**（`gh release download` して `sha256sum`）。
-  v0.2.1 では、GitHub に v0.2.0 と同じ unitypackage が付き、THIRD-PARTY-NOTICES.txt も付いていなかった
-  （2026-09-19 に v0.2.2 の準備中に気づき、v0.2.2 のノートで訂正した）
+  前の版の unitypackage を付け間違えたり、THIRD-PARTY-NOTICES.txt を付け忘れたりしても、見た目では気づけない
 - exe は `IncludeNativeLibrariesForSelfExtract` と `EnableCompressionInSingleFile` を付けて作る。
   無いと WPF のネイティブ DLL が外に出て、exe 1 つでは起動できない
 

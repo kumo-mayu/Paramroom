@@ -9,10 +9,10 @@ description: Paramroom 送信アプリ（tools/Paramroom.App）の画面を確�
 
 ## 道具
 
-`scripts/ui-kit.ps1`（毎回ドットで読み込む）：
+`scripts/ui-kit.ps1`（毎回ドットで読み込む。プロジェクト直下から）：
 
 ```powershell
-. "D:\work\ClaudeCode\avatar-image-pad\.claude\skills\ui-check\scripts\ui-kit.ps1"
+. ".\.claude\skills\ui-check\scripts\ui-kit.ps1"
 ```
 
 | 関数 | 何をするか |
