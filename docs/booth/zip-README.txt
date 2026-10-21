@@ -76,6 +76,7 @@ VRChat のアバターに、PC の画像や QR コードを送って周りの人
   使い方・消し方は、同じフォルダの README.txt にあります。
 
   ここに入っているのは、この Paramroom を出した時点の版です。最新版は ShotLink の配布ページから。
+    BOOTH  : https://kumo-mayu.booth.pm/items/9022718
     GitHub : https://github.com/kumo-mayu/shotlink
 
 

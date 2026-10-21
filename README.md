@@ -157,7 +157,9 @@ Int は 1〜32 のどれでもよいわけではなく、**1 パケットに入�
 相手のアバターに出た QR コードを読み取るには、スマホのカメラのほかに、
 [ShotLink](https://github.com/kumo-mayu/shotlink) も使えます。VRChat で QR コードが写るように写真を撮ると、
 その中身を Windows の通知で知らせ、URL ならクリックで開けます。BOOTH の zip にはおまけとして同梱しています
-（入っているのは Paramroom を出した時点の版です。最新版は ShotLink の配布ページから）。
+（入っているのは Paramroom を出した時点の版です。最新版は
+[GitHub](https://github.com/kumo-mayu/shotlink/releases) か
+[BOOTH](https://kumo-mayu.booth.pm/items/9022718) から）。
 
 ## 仕組み（簡単に）
 

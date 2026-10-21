@@ -197,7 +197,8 @@ Paramroom で出した QR コードを、見ている人がそのまま写真に
 zip の ShotLink-v1.0.0 フォルダにある ShotLink.exe を起動して、QR コードが写るように写真を撮るだけです。使い方・消し方は、同じフォルダの README.txt にあります。
 
 同梱しているのは、この版の Paramroom を出した時点のものです。最新版は ShotLink の配布ページからどうぞ。
-https://github.com/kumo-mayu/shotlink
+BOOTH : https://kumo-mayu.booth.pm/items/9022718
+GitHub : https://github.com/kumo-mayu/shotlink
 ```
 
 ## Windows の警告について
