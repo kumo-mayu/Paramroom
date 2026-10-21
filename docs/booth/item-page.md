@@ -15,8 +15,8 @@
 | 商品名 | 【無料】PARAMROOM - アバターに画像を送信するツール（版番号は入れない） |
 | カテゴリ | ソフトウェア |
 | 年齢制限 | 全年齢 |
-| バリエーション 1 | 無料版（¥0）… `Paramroom-v0.2.2.zip` |
-| バリエーション 2 | 支援版(中身は同じ)（¥500）… 同じ `Paramroom-v0.2.2.zip` |
+| バリエーション 1 | 無料版（¥0）… `Paramroom-v0.2.3.zip` |
+| バリエーション 2 | 支援版(中身は同じ)（¥500）… 同じ `Paramroom-v0.2.3.zip` |
 | タグ | 無料, ツール, VRChat, OSC, ModularAvatar, カスタムシェーダー |
 | 見出しの順（実際のページ） | 本文 → 同梱物 → 基本的な使用方法 → 購入前の注意 → 消費する同期パラメータ → 形式ごとの速さ → Windows の警告について → 利用規約 → よくある質問 → クレジット → 動作確認環境 → 更新履歴 → お問い合わせ（このファイルの並びとは違う） |
 
@@ -45,6 +45,8 @@ PC にある画像ファイル、ブラウザからドラッグした画像、UR
 
 簡単な画像の共有などにどうでしょう。
 
+おまけとして ShotLink（写真に写った QR コードを PC で受け取るアプリ）を同梱しています。下の「おまけ：ShotLink」を見てください。
+
 無料版と支援版の中身は同じです。気に入っていただけたら支援版で応援してもらえると嬉しいです。
 
 ソースコードは GitHub で公開しています（MIT ライセンス）。
@@ -54,12 +56,14 @@ https://github.com/kumo-mayu/Paramroom
 ## 同梱物(最新版)
 
 ```
-- Paramroom-v0.2.2.zip
---- Paramroom-unity-v0.2.2.unitypackage（アバターへの導入ツール）
+- Paramroom-v0.2.3.zip
+--- Paramroom-unity-v0.2.3.unitypackage（アバターへの導入ツール）
 --- Paramroom.App.exe（画像を送る Windows アプリ。インストール不要）
 --- README.txt
 --- LICENSE（MIT）
 --- THIRD-PARTY-NOTICES.txt（アプリが使っているライブラリのライセンス）
+--- ShotLink-v1.0.0/（おまけ。写真に写った QR コードを PC で受け取るアプリ）
+----- ShotLink.exe / README.txt / LICENSE（MIT）/ THIRD-PARTY-NOTICES.txt
 ```
 
 ## 購入前の注意
@@ -158,7 +162,7 @@ QR 専用で迷ったら Int 4 個にしてください。32bit だけで、短�
 
 ```
 【アバターに入れる】
-① VRChat SDK (Avatars) と Modular Avatar を入れたプロジェクトに、Paramroom-unity-v0.2.2.unitypackage をインポートする（Assets/kumo-mayu/Paramroom に入ります）
+① VRChat SDK (Avatars) と Modular Avatar を入れたプロジェクトに、Paramroom-unity-v0.2.3.unitypackage をインポートする（Assets/kumo-mayu/Paramroom に入ります）
 ② ヒエラルキーで導入したいアバターを選ぶ
 ③「Tools > Paramroom > Decoder Builder」を開く。アバターの同期ビットの空きが表示されるので、収まる Int の数を選んで「プレハブを作成」を押す（迷ったら最初に選ばれている 形式 4 ＋ Int 32 個）
 ④ 生成された Assets/kumo-mayu/Paramroom/ParamroomDecoder*.prefab をアバターの直下に置く
@@ -181,6 +185,19 @@ QR 専用で迷ったら Int 4 個にしてください。32bit だけで、短�
 
 詳しい説明は GitHub の README にあります。
 https://github.com/kumo-mayu/Paramroom
+```
+
+## おまけ：ShotLink
+
+```
+VRChat で撮った写真に QR コードが写っていたら、その中身を Windows の通知で知らせるアプリです。URL ならクリックで開けます。
+
+Paramroom で出した QR コードを、見ている人がそのまま写真に撮って受け取れます。見せる相手に渡してもかまいません（MIT ライセンスです）。
+
+zip の ShotLink-v1.0.0 フォルダにある ShotLink.exe を起動して、QR コードが写るように写真を撮るだけです。使い方・消し方は、同じフォルダの README.txt にあります。
+
+同梱しているのは、この版の Paramroom を出した時点のものです。最新版は ShotLink の配布ページからどうぞ。
+https://github.com/kumo-mayu/shotlink
 ```
 
 ## Windows の警告について
@@ -244,6 +261,8 @@ MIT ライセンスです（同梱の LICENSE）。
 - StbImageSharp（Unlicense）
 - .NET ランタイム（MIT）
 
+おまけの ShotLink は同じ作者の別のアプリです（MIT ライセンス）。ライセンスと、使っているライブラリの一覧は、同梱の ShotLink-v1.0.0 フォルダの中にあります。
+
 QRコードは株式会社デンソーウェーブの登録商標です。
 
 サムネイル、動画に使用したアセット
@@ -288,6 +307,11 @@ https://booth.pm/ja/items/6571299
 - Paramroom の入っていないアバターを着ていると、送信アプリが 10 秒ごとに VRChat へ接続し直していた不具合を直した
 - アバターを着替えると、数秒で送信先が切り替わるようになった
 - 説明文を直した（画像は 80 秒ほどでほぼ揃い、全部揃うまでは 90 秒ほど）
+
+2026/10/21 v0.2.3 【アバターの作り直しは不要】
+- おまけとして ShotLink v1.0.0（写真に写った QR コードを PC で受け取るアプリ）を同梱した
+- 送信アプリと CLI を同時に動かしていると、VRChat がどちらに送るか定まらず、片方を閉じたあとに届かなくなることがあった不具合を直した
+- unitypackage の中身は v0.2.2 と同じです
 ```
 
 ## お問い合わせ
