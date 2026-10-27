@@ -36,7 +36,7 @@ THIRD-PARTY-NOTICES.txt・README.txt・BOOTH 用の zip がまとめてできる
   おまけとしてフォルダごと同梱する。** 4つ目の引数で版を選ぶ（既定 `latest`＝公開済みの最新、`none` で入れない）。
   取ってくるのは `tools/release/fetch-shotlink.sh`（ShotLink の zip に添えた `.sha256` で確かめる）。
   ShotLink を更新するたびに Paramroom を差し替えはしない。Paramroom の版を出すときに、その時点の最新を入れる。
-  ShotLink の公開前は `latest` が見つからずに止まるので、`none` を付ける。zip の README の「（版）」は、入れた版に直す
+  ShotLink は 2026-10-21 に v1.0.0 を公開したので、ふだんは既定の `latest` のままでよい。zip の README の「（版）」は、入れた版に直す
 
 - **unitypackage の GUID は前の版から引き継ぐ。** リポジトリに `.meta` が無いので、スクリプトは
   前の版の unitypackage を土台に中身だけ差し替える。GUID が変わると上書きされず、
