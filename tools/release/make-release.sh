@@ -3,7 +3,7 @@
 #
 #   bash tools/release/make-release.sh v0.2.1 v0.2.0 [出力先] [ShotLink の版]
 #
-# 3つ目の出力先の既定は、リポジトリの隣の Paramroom-release（リポジトリの外）。
+# 3つ目の出力先の既定は、リポジトリの隣の releases/Paramroom（リポジトリの外）。
 # 4つ目は zip に同梱する ShotLink の版（既定は latest＝公開済みの最新。none で入れない）。
 # ShotLink は写真に写った QR を PC で受け取るアプリで、Paramroom の QR モードのおまけ。
 # 取ってくるのは tools/release/fetch-shotlink.sh（フォルダごと入れる理由もそこに書いた）。
@@ -17,7 +17,7 @@
 set -euo pipefail
 V=$1; PREV=$2; SHOTLINK=${4:-latest}
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
-BASE=${3:-$(dirname "$ROOT")/Paramroom-release}
+BASE=${3:-$(dirname "$ROOT")/releases/Paramroom}
 OUT="$BASE/$V"; WORK=$(mktemp -d)
 mkdir -p "$OUT"
 
